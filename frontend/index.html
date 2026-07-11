@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Replica — 3D Printing Cost Estimator</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Ambient Background Blobs -->
+    <div class="bg-blob blob-purple"></div>
+    <div class="bg-blob blob-blue"></div>
+    <div class="bg-blob blob-cyan"></div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="brand">
+                <i class="fa-solid fa-cube logo-icon"></i>
+                <div class="brand-text">
+                    <h1>REPLICA</h1>
+                    <span>Cost Estimation System</span>
+                </div>
+            </div>
+            <nav class="app-nav">
+                <button class="nav-btn active" data-tab="public-tab">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Public Estimator
+                </button>
+                <button class="nav-btn" data-tab="developer-tab" id="nav-developer-btn">
+                    <i class="fa-solid fa-gauge"></i> Developer Dashboard
+                </button>
+                <button class="nav-btn" data-tab="superadmin-tab" id="nav-superadmin-btn">
+                    <i class="fa-solid fa-user-shield"></i> Super Admin
+                </button>
+            </nav>
+        </header>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            
+            <!-- TAB 1: Public Estimator (Always Public) -->
+            <section id="public-tab" class="tab-content active">
+                <div class="grid-2col">
+                    <!-- Left: Upload & Inputs -->
+                    <div class="glass-card">
+                        <h2 class="card-title"><i class="fa-solid fa-cube"></i> Quick Estimation</h2>
+                        <p class="card-subtitle">Upload an STL model to compute a rough Tunisian-rate price range instantly.</p>
+                        
+                        <div class="form-group">
+                            <label class="form-label">1. Select Material</label>
+                            <div class="material-grid" id="public-material-grid">
+                                <!-- Dynamically populated -->
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">2. Upload STL File</label>
+                            <div class="upload-dropzone" id="upload-zone">
+                                <input type="file" id="stl-file-input" accept=".stl" style="display: none;">
+                                <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                                <h3>Drag & Drop STL File here</h3>
+                                <p>or click to browse from your computer</p>
+                                <span class="file-limits">Only .stl files are supported</span>
+                            </div>
+                        </div>
+                        
+                        <!-- File Upload Status / Progress -->
+                        <div id="upload-progress-container" class="upload-progress-container hidden">
+                            <div class="file-info-header">
+                                <span id="uploaded-filename"><i class="fa-solid fa-file-invoice"></i> filename.stl</span>
+                                <button id="remove-file-btn" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+                            <div class="progress-bar-wrapper">
+                                <div id="upload-progress-bar" class="progress-bar"></div>
+                            </div>
+                            <span id="upload-status-text">Scanning volume mesh...</span>
+                        </div>
+                    </div>
+
+                    <!-- Right: Results & 3D Viewer -->
+                    <div class="glass-card flex-column">
+                        <div class="viewer-container">
+                            <div id="viewer-placeholder" class="viewer-placeholder">
+                                <i class="fa-solid fa-compass-drafting placeholder-icon"></i>
+                                <p>3D Preview will render here once STL is uploaded</p>
+                            </div>
+                            <canvas id="stl-canvas" class="hidden"></canvas>
+                            <div id="viewer-loading" class="viewer-loading hidden">
+                                <div class="spinner"></div>
+                                <p>Rendering 3D model...</p>
+                            </div>
+                            <div id="viewer-legend" class="viewer-legend hidden">
+                                <span><i class="fa-solid fa-mouse"></i> Drag to rotate</span>
+                                <span><i class="fa-solid fa-arrows-up-down"></i> Scroll to zoom</span>
+                            </div>
+                        </div>
+
+                        <!-- Public Upload Confirmation Screen -->
+                        <div id="public-upload-confirm" class="upload-confirm-panel hidden">
+                            <h3 style="font-size: 1rem; font-weight: 700; color: #a5b4fc; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem;">
+                                <i class="fa-solid fa-circle-info"></i> Verify STL & Select Filament
+                            </h3>
+                            <div class="confirm-details">
+                                <div class="confirm-stat">
+                                    <span class="confirm-label">File Name</span>
+                                    <span class="confirm-val" id="confirm-filename">-</span>
+                                </div>
+                                <div class="confirm-stat">
+                                    <span class="confirm-label">Volume</span>
+                                    <span class="confirm-val" id="confirm-volume">- cm³</span>
+                                </div>
+                                <div class="confirm-stat">
+                                    <span class="confirm-label">Watertight</span>
+                                    <span class="confirm-val" id="confirm-watertight">-</span>
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-top: 0.5rem;">
+                                <label class="form-label" for="confirm-material-select">Filament Material Choice</label>
+                                <select id="confirm-material-select" class="form-input" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white;">
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
+                            <button id="public-calculate-btn" class="submit-btn" style="width: 100%; margin-top: 0.5rem; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); font-weight: bold;">
+                                <i class="fa-solid fa-calculator"></i> Calculate Instant Estimate Range
+                            </button>
+                        </div>
+
+                        <!-- Estimate Output Panel -->
+                        <div id="public-result-card" class="result-card hidden">
+                            <div class="estimate-header">
+                                <span>Estimated Price Range</span>
+                                <h3 id="est-price-range">0 - 0 TND</h3>
+                            </div>
+                            <div class="estimate-stats">
+                                <div class="stat-item">
+                                    <span class="stat-label">Model Volume</span>
+                                    <span class="stat-value" id="est-volume">- cm³</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Estimated Weight</span>
+                                    <span class="stat-value" id="est-weight">- g</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Print Time</span>
+                                    <span class="stat-value" id="est-time">- hrs</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Target Machine</span>
+                                    <span class="stat-value" id="est-machine">-</span>
+                                </div>
+                            </div>
+                            <div class="disclaimer-alert">
+                                <i class="fa-solid fa-circle-info"></i>
+                                <span>Estimates are rough ranges based on default slice settings. Final prices are verified via admin slicer output.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: Developer Dashboard (Protected Auth / Multi-tenant Portal) -->
+            <section id="developer-tab" class="tab-content">
+                <!-- Logged Out Auth Cards -->
+                <div class="grid-2col" id="developer-auth-card" style="grid-template-columns: 1fr 1.25fr; max-width: 1100px; margin: 0 auto; align-items: flex-start;">
+                    <div class="glass-card" style="width: 100%;">
+                        <div class="auth-tabs" style="display: flex; border-bottom: 1px solid var(--card-border); margin-bottom: 1.5rem;">
+                            <button class="auth-tab-btn active" id="auth-login-tab-btn" style="flex: 1;">Login</button>
+                            <button class="auth-tab-btn" id="auth-register-tab-btn" style="flex: 1;">Register</button>
+                        </div>
+                        
+                        <!-- Login Form -->
+                        <form id="developer-login-form">
+                            <h3 class="form-title" style="font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem;">Developer Login</h3>
+                            <div class="form-group">
+                                <label class="form-label" for="login-username">Username</label>
+                                <input type="text" id="login-username" class="form-input" required placeholder="e.g. janesmith">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="login-password">Password</label>
+                                <input type="password" id="login-password" class="form-input" required placeholder="••••••••">
+                            </div>
+                            <button type="submit" class="submit-btn margin-top-sm">
+                                <i class="fa-solid fa-right-to-bracket"></i> Login
+                            </button>
+                        </form>
+                        
+                        <!-- Register Form -->
+                        <form id="developer-register-form" class="hidden">
+                            <h3 class="form-title" style="font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem;">Create Developer Account</h3>
+                            <div class="form-group">
+                                <label class="form-label" for="register-username">Username</label>
+                                <input type="text" id="register-username" class="form-input" required placeholder="Choose a unique username">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="register-password">Password</label>
+                                <input type="password" id="register-password" class="form-input" required placeholder="At least 6 characters">
+                            </div>
+                            <button type="submit" class="submit-btn margin-top-sm">
+                                <i class="fa-solid fa-user-plus"></i> Create Account
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <div class="glass-card" style="width: 100%;">
+                        <h2 class="card-title"><i class="fa-solid fa-circle-nodes" style="color: var(--primary-light);"></i> Estimator SaaS Engine</h2>
+                        <p class="card-subtitle" style="margin-bottom: 1.2rem;">By creating a developer account, you unlock powerful customizable 3D print pricing tools:</p>
+                        <ul style="color: var(--text-main); font-size: 0.9rem; line-height: 1.6; display: flex; flex-direction: column; gap: 0.75rem; padding-left: 1.2rem;">
+                            <li><strong>Custom Formulas</strong>: Edit margins, labor rates, electricity tariffs, and machine wear factors.</li>
+                            <li><strong>Custom Filament Inventory</strong>: Specify custom density & pricing per kg for your exact filaments.</li>
+                            <li><strong>API Integration</strong>: Generate keys to retrieve cost estimations based on your settings directly into your own app or website.</li>
+                            <li><strong>Detailed Invoices</strong>: Access a private, precise print calculator on your dashboard.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Logged In Developer Dashboard Container -->
+                <div class="glass-card flex-column hidden" id="developer-dashboard-card" style="width: 100%;">
+                    <div class="dev-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+                        <div>
+                            <h2 class="card-title" style="font-size: 1.5rem; font-weight: 700;"><i class="fa-solid fa-terminal"></i> Registered User Console</h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">Signed in as: <strong id="dev-username-span" style="color: #a5b4fc;">developer</strong> <span class="badge-role">Developer</span></p>
+                        </div>
+                        <button id="developer-logout-btn" class="tbl-btn btn-danger" style="padding: 0.5rem 1rem;"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+                    </div>
+
+                    <!-- Inner Dashboard Navigation -->
+                    <div class="dashboard-nav">
+                        <button class="db-tab-btn active" data-db-tab="db-calculator">
+                            <i class="fa-solid fa-calculator"></i> Private Calculator
+                        </button>
+                        <button class="db-tab-btn" data-db-tab="db-settings">
+                            <i class="fa-solid fa-sliders"></i> My Settings
+                        </button>
+                        <button class="db-tab-btn" data-db-tab="db-keys">
+                            <i class="fa-solid fa-key"></i> My API Keys
+                        </button>
+                        <button class="db-tab-btn" data-db-tab="db-uploads">
+                            <i class="fa-solid fa-folder-open"></i> My Uploads Log
+                        </button>
+                    </div>
+
+                    <!-- Dashboard Sections Content -->
+                    <div class="dashboard-sections">
+                        
+                        <!-- Panel A: Private Precise Calculator -->
+                        <div id="db-calculator" class="active">
+                            <div class="grid-2col">
+                                <div class="glass-card" style="border: none; background: transparent; padding: 0;">
+                                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;"><i class="fa-solid fa-calculator"></i> Sliced Slicer Metrics</h3>
+                                    <p class="card-subtitle" style="margin-bottom: 1.2rem;">Calculate exact costs using your customized filament rates, electricity rates, and margins.</p>
+                                    
+                                    <form id="admin-calc-form" class="admin-form">
+                                        <div class="form-row">
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="admin-material">Material Type</label>
+                                                <select id="admin-material" class="form-input" required>
+                                                    <!-- Populated dynamically -->
+                                                </select>
+                                            </div>
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="admin-machine">Machine Used</label>
+                                                <select id="admin-machine" class="form-input" required>
+                                                    <!-- Populated dynamically -->
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="admin-weight">Actual Weight (grams)</label>
+                                                <div class="input-unit-wrapper">
+                                                    <input type="number" id="admin-weight" min="0.1" step="0.1" class="form-input" placeholder="e.g. 45.2" required>
+                                                    <span class="input-unit">g</span>
+                                                </div>
+                                            </div>
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="admin-time">Print Time (minutes)</label>
+                                                <div class="input-unit-wrapper">
+                                                    <input type="number" id="admin-time" min="1" step="1" class="form-input" placeholder="e.g. 185" required>
+                                                    <span class="input-unit">mins</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label" for="admin-labor">Post-Processing / Labor Time (hours)</label>
+                                            <div class="input-unit-wrapper">
+                                                <input type="number" id="admin-labor" min="0" step="0.1" class="form-input" value="0">
+                                                <span class="input-unit">hrs</span>
+                                            </div>
+                                        </div>
+                                        <button type="submit" class="submit-btn">
+                                            <i class="fa-solid fa-wand-magic-sparkles"></i> Compute Custom Quote Invoice
+                                        </button>
+                                    </form>
+                                </div>
+
+                                <div class="glass-card flex-column justify-center" style="background: rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.03);">
+                                    <div id="admin-placeholder" class="admin-placeholder-state">
+                                        <i class="fa-solid fa-receipt placeholder-icon"></i>
+                                        <p>Input print parameters to generate detailed cost breakdown.</p>
+                                    </div>
+                                    <div id="admin-result-container" class="admin-result-container hidden" style="width: 100%;">
+                                        <div class="invoice-box">
+                                            <div class="invoice-header">
+                                                <h3>Job Cost Breakdown</h3>
+                                                <span class="status-tag">Custom Quote</span>
+                                            </div>
+                                            <div class="invoice-items">
+                                                <div class="invoice-item">
+                                                    <span>Material Cost</span>
+                                                    <span class="val" id="inv-mat-cost">0.00 TND</span>
+                                                </div>
+                                                <div class="invoice-item">
+                                                    <span>Electricity Cost</span>
+                                                    <span class="val" id="inv-elec-cost">0.00 TND</span>
+                                                </div>
+                                                <div class="invoice-divider"></div>
+                                                <div class="invoice-item highlight">
+                                                    <span>Direct Cost Subtotal</span>
+                                                    <span class="val" id="inv-direct-cost">0.00 TND</span>
+                                                </div>
+                                                <div class="invoice-item">
+                                                    <span>Wear & Tear (Nozzle/Hotend)</span>
+                                                    <span class="val" id="inv-wear-cost">0.00 TND</span>
+                                                </div>
+                                                <div class="invoice-item">
+                                                    <span>Labor & Post-Processing</span>
+                                                    <span class="val" id="inv-labor-cost">0.00 TND</span>
+                                                </div>
+                                                <div class="invoice-divider"></div>
+                                                <div class="invoice-item highlight">
+                                                    <span>Total Base Cost</span>
+                                                    <span class="val" id="inv-subtotal">0.00 TND</span>
+                                                </div>
+                                                <div class="invoice-item">
+                                                    <span>Profit Margin Add-on</span>
+                                                    <span class="val" id="inv-margin-val">0.00 TND</span>
+                                                </div>
+                                            </div>
+                                            <div class="invoice-total">
+                                                <span class="total-label">Selling Price</span>
+                                                <div class="total-amount-box">
+                                                    <span class="total-amount" id="inv-selling-price">0.00</span>
+                                                    <span class="currency">TND</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Panel B: My Settings (Multi-tenant overrides) -->
+                        <div id="db-settings">
+                            <div class="grid-2col">
+                                <div class="flex-column" style="padding: 10px;">
+                                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;"><i class="fa-solid fa-gears"></i> Core Formulas & Rates</h3>
+                                    <p class="card-subtitle" style="margin-bottom: 1.2rem;">Define custom hourly labor rates, profit margins, and machine variables.</p>
+                                    
+                                    <form id="developer-settings-form">
+                                        <div class="form-row">
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="cfg-electricity">Electricity Rate (TND/kWh)</label>
+                                                <input type="number" id="cfg-electricity" step="0.001" min="0" class="form-input">
+                                            </div>
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="cfg-wear-tear">Wear & Tear (% of Direct Cost)</label>
+                                                <div class="input-unit-wrapper">
+                                                    <input type="number" id="cfg-wear-tear" min="0" max="100" class="form-input">
+                                                    <span class="input-unit">%</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="cfg-margin">Default Profit Margin (%)</label>
+                                                <div class="input-unit-wrapper">
+                                                    <input type="number" id="cfg-margin" min="0" max="1000" class="form-input">
+                                                    <span class="input-unit">%</span>
+                                                </div>
+                                            </div>
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="cfg-labor">Hourly Labor Rate (TND/hr)</label>
+                                                <input type="number" id="cfg-labor" step="0.5" min="0" class="form-input">
+                                            </div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="cfg-infill">Assumed Mesh Infill (%)</label>
+                                                <div class="input-unit-wrapper">
+                                                    <input type="number" id="cfg-infill" min="1" max="100" class="form-input">
+                                                    <span class="input-unit">%</span>
+                                                </div>
+                                            </div>
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="cfg-support">Support Buffer Weight (%)</label>
+                                                <div class="input-unit-wrapper">
+                                                    <input type="number" id="cfg-support" min="0" max="100" class="form-input">
+                                                    <span class="input-unit">%</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button type="submit" class="submit-btn save-btn" style="margin-top: 1rem;">
+                                            <i class="fa-solid fa-floppy-disk"></i> Save Core Variables
+                                        </button>
+                                    </form>
+                                </div>
+
+                                <div class="flex-column" style="padding: 10px; gap: 1.5rem;">
+                                    <div>
+                                        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;"><i class="fa-solid fa-boxes-stacked"></i> Materials & Machines</h3>
+                                        <p class="card-subtitle" style="margin-bottom: 1.2rem;">Adjust material density/pricing and machine energy/premium overrides.</p>
+                                        
+                                        <h4 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.5rem; color: #a5b4fc;">Filament Pricing Override</h4>
+                                        <div class="table-container" style="margin-bottom: 1.2rem;">
+                                            <table class="config-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Material</th>
+                                                        <th>Density (g/cm³)</th>
+                                                        <th>Price per kg (TND)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="settings-materials-tbody">
+                                                    <!-- Dynamically populated -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <h4 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.5rem; color: #a5b4fc;">Machine Tariff Overrides</h4>
+                                        <div class="table-container">
+                                            <table class="config-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Machine</th>
+                                                        <th>Power (Watts)</th>
+                                                        <th>Flat Job Premium (TND)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="settings-machines-tbody">
+                                                    <!-- Dynamically populated -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Panel C: My API Keys -->
+                        <div id="db-keys">
+                            <div class="grid-2col" style="grid-template-columns: 1.4fr 1fr; align-items: flex-start;">
+                                <div>
+                                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.8rem;">My Active Keys</h3>
+                                    <div class="table-container">
+                                        <table class="config-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Description</th>
+                                                    <th>API Key</th>
+                                                    <th>Calls</th>
+                                                    <th style="width: 70px; text-align: center;">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="developer-keys-tbody">
+                                                <!-- Dynamically populated -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); border: 1px dashed var(--card-border); border-radius: 12px; padding: 1.2rem;">
+                                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.3rem;"><i class="fa-solid fa-plus-circle"></i> Generate API Key</h3>
+                                    <p class="card-subtitle" style="margin-bottom: 1rem; font-size: 0.8rem;">Generate a key to fetch estimates on your external website.</p>
+                                    <form id="generate-dev-key-form">
+                                        <div class="form-group">
+                                            <label class="form-label" for="dev-key-owner">Application name / Description</label>
+                                            <input type="text" id="dev-key-owner" class="form-input" required placeholder="e.g. My Bambu Slicer Shop" maxlength="50">
+                                        </div>
+                                        <button type="submit" class="submit-btn" style="padding: 0.7rem 1rem;">
+                                            <i class="fa-solid fa-plus"></i> Generate Key
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Panel D: My Uploads Log -->
+                        <div id="db-uploads">
+                            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.8rem;">My Integrations Upload History</h3>
+                            <p class="card-subtitle" style="margin-bottom: 1rem;">View STL model files uploaded by visitors using your API Keys.</p>
+                            <div class="table-container">
+                                <table class="config-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date Uploaded</th>
+                                            <th>Filename</th>
+                                            <th>Volume (cm³)</th>
+                                            <th>Weight (g)</th>
+                                            <th>Invoice Quote</th>
+                                            <th>API Key Used</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="developer-uploads-tbody">
+                                        <!-- Dynamically populated -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: Super Admin Console (Passcode-Session Protected) -->
+            <section id="superadmin-tab" class="tab-content">
+                <!-- Locked view -->
+                <div id="superadmin-lock-screen" class="lock-screen-container">
+                    <div class="lock-card glass-card">
+                        <i class="fa-solid fa-user-shield lock-icon" style="color: #ef4444;"></i>
+                        <h2>Super Admin Panel Locked</h2>
+                        <p>Enter the Super Admin Password to manage platform variables, user accounts, and uploads.</p>
+                        <div class="passcode-input-group">
+                            <input type="password" id="superadmin-passcode" class="form-input text-center" placeholder="••••••••">
+                            <button id="unlock-superadmin-btn" class="submit-btn" style="background: var(--error);"><i class="fa-solid fa-unlock"></i> Unlock</button>
+                        </div>
+                        <p id="superadmin-lock-error-text" class="error-text hidden">Invalid admin credentials. Please try again.</p>
+                    </div>
+                </div>
+
+                <!-- Unlocked Super Admin Dashboard -->
+                <div class="glass-card flex-column hidden" id="superadmin-dashboard-card" style="width: 100%;">
+                    <div class="dev-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+                        <div>
+                            <h2 class="card-title" style="font-size: 1.5rem; font-weight: 700; color: #ef4444;"><i class="fa-solid fa-user-shield"></i> Platform Management Console</h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">Super Admin Session: <strong style="color: #ef4444;">Active</strong> <span class="badge-role admin">Super Admin</span></p>
+                        </div>
+                        <button id="superadmin-logout-btn" class="tbl-btn btn-danger" style="padding: 0.5rem 1rem;"><i class="fa-solid fa-lock"></i> Lock Session</button>
+                    </div>
+
+                    <!-- Inner Super Admin Navigation -->
+                    <div class="dashboard-nav">
+                        <button class="db-tab-btn active" data-sa-tab="sa-settings">
+                            <i class="fa-solid fa-sliders"></i> Platform Settings
+                        </button>
+                        <button class="db-tab-btn" data-sa-tab="sa-users">
+                            <i class="fa-solid fa-users"></i> User Accounts
+                        </button>
+                        <button class="db-tab-btn" data-sa-tab="sa-keys">
+                            <i class="fa-solid fa-key"></i> Global API Keys
+                        </button>
+                        <button class="db-tab-btn" data-sa-tab="sa-uploads">
+                            <i class="fa-solid fa-folder-open"></i> Platform Uploads Log
+                        </button>
+                    </div>
+
+                    <!-- Super Admin Sections -->
+                    <div class="dashboard-sections">
+                        
+                        <!-- Panel A: Platform Variables (Global settings, Quick settings, Security settings) -->
+                        <div id="sa-settings" class="active">
+                            <form id="sa-global-settings-form">
+                                <div class="grid-2col">
+                                    <div class="flex-column" style="padding: 10px;">
+                                        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; color: #67e8f9;"><i class="fa-solid fa-cube"></i> Quick Estimation Settings</h3>
+                                        <p class="card-subtitle" style="margin-bottom: 1.2rem;">Configure parameters specifically for the public quick estimator (Tunisian price calculator).</p>
+                                        <div class="form-row">
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="sa-public-infill">Public Assumed Infill (%)</label>
+                                                <div class="input-unit-wrapper">
+                                                    <input type="number" id="sa-public-infill" min="1" max="100" class="form-input">
+                                                    <span class="input-unit">%</span>
+                                                </div>
+                                            </div>
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="sa-public-support">Public Support Weight (%)</label>
+                                                <div class="input-unit-wrapper">
+                                                    <input type="number" id="sa-public-support" min="0" max="100" class="form-input">
+                                                    <span class="input-unit">%</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="sa-public-min-price">Public Min Price Cap (TND)</label>
+                                                <div class="input-unit-wrapper">
+                                                    <input type="number" id="sa-public-min-price" min="1" step="0.5" class="form-input">
+                                                    <span class="input-unit">TND</span>
+                                                </div>
+                                            </div>
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="sa-public-margin">Public Margin (%)</label>
+                                                <div class="input-unit-wrapper">
+                                                    <input type="number" id="sa-public-margin" min="0" max="500" class="form-input">
+                                                    <span class="input-unit">%</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="sa-public-min-offset">Price Range Min Offset (%)</label>
+                                                <div class="input-unit-wrapper">
+                                                    <input type="number" id="sa-public-min-offset" min="10" max="100" class="form-input">
+                                                    <span class="input-unit">%</span>
+                                                </div>
+                                            </div>
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="sa-public-max-offset">Price Range Max Offset (%)</label>
+                                                <div class="input-unit-wrapper">
+                                                    <input type="number" id="sa-public-max-offset" min="100" max="300" class="form-input">
+                                                    <span class="input-unit">%</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Security Title above the limits and cooldown fields -->
+                                        <h3 class="security-section-title"><i class="fa-solid fa-shield-halved"></i> Platform Security</h3>
+                                        <p class="card-subtitle" style="margin-bottom: 1.2rem;">Adjust rate limiting thresholds to prevent database overflow or denial of service.</p>
+                                        
+                                        <div class="form-row">
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="sa-upload-limit">Upload Rate Limit (Scans)</label>
+                                                <input type="number" id="sa-upload-limit" min="1" step="1" class="form-input">
+                                            </div>
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="sa-upload-cooldown">Rate Limit Cooldown (Seconds)</label>
+                                                <div class="input-unit-wrapper">
+                                                    <input type="number" id="sa-upload-cooldown" min="5" step="1" class="form-input">
+                                                    <span class="input-unit">s</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+ 
+                                    <div class="flex-column" style="padding: 10px;">
+                                        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; color: #67e8f9;"><i class="fa-solid fa-boxes-stacked"></i> Public Material Pricing</h3>
+                                        <p class="card-subtitle" style="margin-bottom: 1.2rem;">Define the pricing parameters of default filaments used in public estimation.</p>
+                                        
+                                        <div class="table-container" style="margin-bottom: 1.5rem;">
+                                            <table class="config-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Filament Name</th>
+                                                        <th>Density (g/cm³)</th>
+                                                        <th>Global Price per kg (TND)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="sa-materials-tbody">
+                                                    <!-- Dynamically populated -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+ 
+                                        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; color: #67e8f9;"><i class="fa-solid fa-print"></i> Public Machine Tariffs</h3>
+                                        <div class="table-container" style="margin-bottom: 1.5rem;">
+                                            <table class="config-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Machine Model</th>
+                                                        <th>Power Consumption (W)</th>
+                                                        <th>Flat Job Premium (TND)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="sa-machines-tbody">
+                                                    <!-- Dynamically populated -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <button type="submit" class="submit-btn" style="margin-top: 0.5rem; background: linear-gradient(135deg, #ef4444, #b91c1c);">
+                                            <i class="fa-solid fa-floppy-disk"></i> Save Platform Settings
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Panel B: User Accounts Manager -->
+                        <div id="sa-users">
+                            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.8rem;">Registered Developer Accounts</h3>
+                            <p class="card-subtitle" style="margin-bottom: 1rem;">View and manage platform developer accounts. Delete users or reset their passwords.</p>
+                            <div class="table-container">
+                                <table class="config-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Username</th>
+                                            <th>Created Date</th>
+                                            <th>API Keys Count</th>
+                                            <th>Total Requests</th>
+                                            <th style="width: 180px; text-align: center;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sa-users-tbody">
+                                        <!-- Dynamically populated -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Panel C: Global API Keys manager -->
+                        <div id="sa-keys">
+                            <div class="grid-2col" style="grid-template-columns: 1.4fr 1fr; align-items: flex-start;">
+                                <div>
+                                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.8rem;">All Active Keys</h3>
+                                    <div class="table-container">
+                                        <table class="config-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>API Key</th>
+                                                    <th>Description</th>
+                                                    <th>Owner</th>
+                                                    <th>Calls</th>
+                                                    <th style="width: 90px; text-align: center;">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="sa-keys-tbody">
+                                                <!-- Dynamically populated -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); border: 1px dashed var(--card-border); border-radius: 12px; padding: 1.2rem;">
+                                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.3rem;"><i class="fa-solid fa-plus-circle"></i> Generate Super Admin Key</h3>
+                                    <p class="card-subtitle" style="margin-bottom: 1rem; font-size: 0.8rem;">Generate an API Key for your own external uses.</p>
+                                    <form id="generate-sa-key-form">
+                                        <div class="form-group">
+                                            <label class="form-label" for="sa-key-owner">Description / Application</label>
+                                            <input type="text" id="sa-key-owner" class="form-input" required placeholder="e.g. Super Admin integration" maxlength="50">
+                                        </div>
+                                        <button type="submit" class="submit-btn" style="padding: 0.7rem 1rem; background: var(--error);">
+                                            <i class="fa-solid fa-plus"></i> Generate Admin Key
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Panel D: Platform Uploads Log -->
+                        <div id="sa-uploads">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <div>
+                                    <h3 style="font-size: 1.1rem; font-weight: 700;">Platform-Wide Upload Log</h3>
+                                    <p class="card-subtitle">Monitor and delete all uploaded STL mesh files across the platform.</p>
+                                </div>
+                                <button id="delete-selected-uploads-btn" class="tbl-btn btn-danger hidden">
+                                    <i class="fa-solid fa-trash"></i> Delete Selected (<span id="selected-uploads-count">0</span>)
+                                </button>
+                            </div>
+                            <div class="table-container">
+                                <table class="config-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 40px; text-align: center;"><input type="checkbox" id="select-all-uploads"></th>
+                                            <th>Date Uploaded</th>
+                                            <th>Filename</th>
+                                            <th>Volume (cm³)</th>
+                                            <th>Estimated Weight (g)</th>
+                                            <th>Price Range</th>
+                                            <th>API Key Used</th>
+                                            <th style="width: 100px; text-align: center;">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sa-uploads-tbody">
+                                        <!-- Dynamically populated -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+        
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>&copy; 2026 Replica 3D printing & Reverse Engineering. Mahdia, Tunisia.</p>
+            <div class="footer-links">
+                <a href="/docs" target="_blank"><i class="fa-solid fa-book-open"></i> API Documentation</a>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Custom Modal for Delete Confirmation -->
+    <div id="confirm-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-triangle-exclamation" style="color: var(--error);"></i> Confirm Deletion</h3>
+                <button class="modal-close-btn" id="confirm-modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-modal-text">Are you sure you want to delete the selected files? This action cannot be undone and the files will be permanently removed from disk.</p>
+            </div>
+            <div class="modal-footer">
+                <button id="confirm-modal-cancel-btn" class="tbl-btn">Cancel</button>
+                <button id="confirm-modal-confirm-btn" class="submit-btn save-btn" style="background: var(--error); margin: 0; padding: 0.6rem 1.2rem;">Yes, Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Three.js and plugins for STL viewer -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- App Script -->
+    <script src="app.js"></script>
+</body>
+</html>
