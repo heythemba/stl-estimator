@@ -2,7 +2,7 @@ import io
 import trimesh
 import numpy as np
 from sqlalchemy.orm import Session
-from backend.database import Material, Machine, GlobalSetting, TimeBracket
+from backend.database import Material, Machine, GlobalSetting, TimeBracket, UserSetting, UserMaterial, UserMachine
 
 def parse_stl_volume(file_bytes: bytes):
     """
