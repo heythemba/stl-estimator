@@ -4,3 +4,4 @@ trimesh
 numpy
 sqlalchemy
 python-multipart
+requests

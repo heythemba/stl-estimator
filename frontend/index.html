@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,12 +8,14 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Stylesheet -->
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <!-- Ambient Background Blobs -->
     <div class="bg-blob blob-purple"></div>
@@ -44,15 +47,16 @@
 
         <!-- Main Content -->
         <main class="app-main">
-            
+
             <!-- TAB 1: Public Estimator (Always Public) -->
             <section id="public-tab" class="tab-content active">
                 <div class="grid-2col">
                     <!-- Left: Upload & Inputs -->
                     <div class="glass-card">
                         <h2 class="card-title"><i class="fa-solid fa-cube"></i> Quick Estimation</h2>
-                        <p class="card-subtitle">Upload an STL model to compute a rough Tunisian-rate price range instantly.</p>
-                        
+                        <p class="card-subtitle">Upload an STL model to compute a rough Tunisian-rate price range
+                            instantly.</p>
+
                         <div class="form-group">
                             <label class="form-label">1. Select Material</label>
                             <div class="material-grid" id="public-material-grid">
@@ -70,11 +74,12 @@
                                 <span class="file-limits">Only .stl files are supported</span>
                             </div>
                         </div>
-                        
+
                         <!-- File Upload Status / Progress -->
                         <div id="upload-progress-container" class="upload-progress-container hidden">
                             <div class="file-info-header">
-                                <span id="uploaded-filename"><i class="fa-solid fa-file-invoice"></i> filename.stl</span>
+                                <span id="uploaded-filename"><i class="fa-solid fa-file-invoice"></i>
+                                    filename.stl</span>
                                 <button id="remove-file-btn" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
                             </div>
                             <div class="progress-bar-wrapper">
@@ -104,7 +109,8 @@
 
                         <!-- Public Upload Confirmation Screen -->
                         <div id="public-upload-confirm" class="upload-confirm-panel hidden">
-                            <h3 style="font-size: 1rem; font-weight: 700; color: #a5b4fc; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem;">
+                            <h3
+                                style="font-size: 1rem; font-weight: 700; color: #a5b4fc; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem;">
                                 <i class="fa-solid fa-circle-info"></i> Verify STL & Select Filament
                             </h3>
                             <div class="confirm-details">
@@ -123,11 +129,13 @@
                             </div>
                             <div class="form-group" style="margin-top: 0.5rem;">
                                 <label class="form-label" for="confirm-material-select">Filament Material Choice</label>
-                                <select id="confirm-material-select" class="form-input" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white;">
+                                <select id="confirm-material-select" class="form-input"
+                                    style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white;">
                                     <!-- Populated dynamically -->
                                 </select>
                             </div>
-                            <button id="public-calculate-btn" class="submit-btn" style="width: 100%; margin-top: 0.5rem; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); font-weight: bold;">
+                            <button id="public-calculate-btn" class="submit-btn"
+                                style="width: 100%; margin-top: 0.5rem; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); font-weight: bold;">
                                 <i class="fa-solid fa-calculator"></i> Calculate Instant Estimate Range
                             </button>
                         </div>
@@ -158,7 +166,8 @@
                             </div>
                             <div class="disclaimer-alert">
                                 <i class="fa-solid fa-circle-info"></i>
-                                <span>Estimates are rough ranges based on default slice settings. Final prices are verified via admin slicer output.</span>
+                                <span>Estimates are rough ranges based on default slice settings. Final prices are
+                                    verified via admin slicer output.</span>
                             </div>
                         </div>
                     </div>
@@ -168,66 +177,121 @@
             <!-- TAB 2: Developer Dashboard (Protected Auth / Multi-tenant Portal) -->
             <section id="developer-tab" class="tab-content">
                 <!-- Logged Out Auth Cards -->
-                <div class="grid-2col" id="developer-auth-card" style="grid-template-columns: 1fr 1.25fr; max-width: 1100px; margin: 0 auto; align-items: flex-start;">
+                <div class="grid-2col" id="developer-auth-card"
+                    style="grid-template-columns: 1fr 1.25fr; max-width: 1100px; margin: 0 auto; align-items: flex-start;">
                     <div class="glass-card" style="width: 100%;">
-                        <div class="auth-tabs" style="display: flex; border-bottom: 1px solid var(--card-border); margin-bottom: 1.5rem;">
+                        <div class="auth-tabs"
+                            style="display: flex; border-bottom: 1px solid var(--card-border); margin-bottom: 1.5rem;">
                             <button class="auth-tab-btn active" id="auth-login-tab-btn" style="flex: 1;">Login</button>
                             <button class="auth-tab-btn" id="auth-register-tab-btn" style="flex: 1;">Register</button>
                         </div>
-                        
+
                         <!-- Login Form -->
                         <form id="developer-login-form">
-                            <h3 class="form-title" style="font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem;">Developer Login</h3>
+                            <h3 class="form-title" style="font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem;">
+                                Developer Login</h3>
                             <div class="form-group">
-                                <label class="form-label" for="login-username">Username</label>
-                                <input type="text" id="login-username" class="form-input" required placeholder="e.g. janesmith">
+                                <label class="form-label" for="login-identity">Username or Email</label>
+                                <input type="text" id="login-identity" class="form-input" required
+                                    placeholder="e.g. janesmith or jane@example.com">
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="login-password">Password</label>
-                                <input type="password" id="login-password" class="form-input" required placeholder="••••••••">
+                                <input type="password" id="login-password" class="form-input" required
+                                    placeholder="••••••••">
                             </div>
-                            <button type="submit" class="submit-btn margin-top-sm">
-                                <i class="fa-solid fa-right-to-bracket"></i> Login
-                            </button>
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+                                <button type="submit" class="submit-btn">
+                                    <i class="fa-solid fa-right-to-bracket"></i> Login
+                                </button>
+                                <a href="#" id="forgot-password-link"
+                                    style="color: var(--primary-light); font-size: 0.85rem; text-decoration: none;">Forgot
+                                    Password?</a>
+                            </div>
                         </form>
-                        
+
                         <!-- Register Form -->
                         <form id="developer-register-form" class="hidden">
-                            <h3 class="form-title" style="font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem;">Create Developer Account</h3>
+                            <h3 class="form-title" style="font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem;">
+                                Create Developer Account</h3>
                             <div class="form-group">
                                 <label class="form-label" for="register-username">Username</label>
-                                <input type="text" id="register-username" class="form-input" required placeholder="Choose a unique username">
+                                <input type="text" id="register-username" class="form-input" required
+                                    placeholder="Choose a unique username">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="register-email">Email Address</label>
+                                <input type="email" id="register-email" class="form-input" required
+                                    placeholder="e.g. jane@example.com">
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="register-password">Password</label>
-                                <input type="password" id="register-password" class="form-input" required placeholder="At least 6 characters">
+                                <input type="password" id="register-password" class="form-input" required
+                                    placeholder="At least 6 characters">
                             </div>
                             <button type="submit" class="submit-btn margin-top-sm">
                                 <i class="fa-solid fa-user-plus"></i> Create Account
                             </button>
                         </form>
+
+                        <!-- Forgot Password Form -->
+                        <form id="developer-forgot-form" class="hidden">
+                            <h3 class="form-title" style="font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem;">
+                                Reset Password</h3>
+                            <p class="card-subtitle" style="margin-bottom: 1.2rem; font-size: 0.85rem;">
+                                Enter your email address below and we'll send you a password reset link.
+                            </p>
+                            <div class="form-group">
+                                <label class="form-label" for="forgot-email">Email Address</label>
+                                <input type="email" id="forgot-email" class="form-input" required
+                                    placeholder="e.g. jane@example.com">
+                            </div>
+                            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                                <button type="submit" class="submit-btn" style="flex: 1;">
+                                    <i class="fa-solid fa-envelope"></i> Send Reset Link
+                                </button>
+                                <button type="button" id="forgot-back-btn" class="tbl-btn"
+                                    style="padding: 0.8rem 1rem;">
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
                     </div>
-                    
+
                     <div class="glass-card" style="width: 100%;">
-                        <h2 class="card-title"><i class="fa-solid fa-circle-nodes" style="color: var(--primary-light);"></i> Estimator SaaS Engine</h2>
-                        <p class="card-subtitle" style="margin-bottom: 1.2rem;">By creating a developer account, you unlock powerful customizable 3D print pricing tools:</p>
-                        <ul style="color: var(--text-main); font-size: 0.9rem; line-height: 1.6; display: flex; flex-direction: column; gap: 0.75rem; padding-left: 1.2rem;">
-                            <li><strong>Custom Formulas</strong>: Edit margins, labor rates, electricity tariffs, and machine wear factors.</li>
-                            <li><strong>Custom Filament Inventory</strong>: Specify custom density & pricing per kg for your exact filaments.</li>
-                            <li><strong>API Integration</strong>: Generate keys to retrieve cost estimations based on your settings directly into your own app or website.</li>
-                            <li><strong>Detailed Invoices</strong>: Access a private, precise print calculator on your dashboard.</li>
+                        <h2 class="card-title"><i class="fa-solid fa-circle-nodes"
+                                style="color: var(--primary-light);"></i> Estimator SaaS Engine</h2>
+                        <p class="card-subtitle" style="margin-bottom: 1.2rem;">By creating a developer account, you
+                            unlock powerful customizable 3D print pricing tools:</p>
+                        <ul
+                            style="color: var(--text-main); font-size: 0.9rem; line-height: 1.6; display: flex; flex-direction: column; gap: 0.75rem; padding-left: 1.2rem;">
+                            <li><strong>Custom Formulas</strong>: Edit margins, labor rates, electricity tariffs, and
+                                machine wear factors.</li>
+                            <li><strong>Custom Filament Inventory</strong>: Specify custom density & pricing per kg for
+                                your exact filaments.</li>
+                            <li><strong>API Integration</strong>: Generate keys to retrieve cost estimations based on
+                                your settings directly into your own app or website.</li>
+                            <li><strong>Detailed Invoices</strong>: Access a private, precise print calculator on your
+                                dashboard.</li>
                         </ul>
                     </div>
                 </div>
 
                 <!-- Logged In Developer Dashboard Container -->
                 <div class="glass-card flex-column hidden" id="developer-dashboard-card" style="width: 100%;">
-                    <div class="dev-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+                    <div class="dev-header"
+                        style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 1rem; margin-bottom: 1.5rem;">
                         <div>
-                            <h2 class="card-title" style="font-size: 1.5rem; font-weight: 700;"><i class="fa-solid fa-terminal"></i> Registered User Console</h2>
-                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">Signed in as: <strong id="dev-username-span" style="color: #a5b4fc;">developer</strong> <span class="badge-role">Developer</span></p>
+                            <h2 class="card-title" style="font-size: 1.5rem; font-weight: 700;"><i
+                                    class="fa-solid fa-terminal"></i> Registered User Console</h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">Signed in as:
+                                <strong id="dev-username-span" style="color: #a5b4fc;">developer</strong> <span
+                                    class="badge-role">Developer</span>
+                            </p>
                         </div>
-                        <button id="developer-logout-btn" class="tbl-btn btn-danger" style="padding: 0.5rem 1rem;"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+                        <button id="developer-logout-btn" class="tbl-btn btn-danger" style="padding: 0.5rem 1rem;"><i
+                                class="fa-solid fa-right-from-bracket"></i> Logout</button>
                     </div>
 
                     <!-- Inner Dashboard Navigation -->
@@ -248,14 +312,16 @@
 
                     <!-- Dashboard Sections Content -->
                     <div class="dashboard-sections">
-                        
+
                         <!-- Panel A: Private Precise Calculator -->
                         <div id="db-calculator" class="active">
                             <div class="grid-2col">
-                                <div class="glass-card" style="border: none; background: transparent; padding: 0;">
-                                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;"><i class="fa-solid fa-calculator"></i> Sliced Slicer Metrics</h3>
-                                    <p class="card-subtitle" style="margin-bottom: 1.2rem;">Calculate exact costs using your customized filament rates, electricity rates, and margins.</p>
-                                    
+                                <div class="glass-card" style="border: none; background: transparent; padding: 1rem;">
+                                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;"><i
+                                            class="fa-solid fa-calculator"></i> Sliced Slicer Metrics</h3>
+                                    <p class="card-subtitle" style="margin-bottom: 1.2rem;">Calculate exact costs using
+                                        your customized filament rates, electricity rates, and margins.</p>
+
                                     <form id="admin-calc-form" class="admin-form">
                                         <div class="form-row">
                                             <div class="form-group flex-1">
@@ -273,24 +339,29 @@
                                         </div>
                                         <div class="form-row">
                                             <div class="form-group flex-1">
-                                                <label class="form-label" for="admin-weight">Actual Weight (grams)</label>
+                                                <label class="form-label" for="admin-weight">Actual Weight
+                                                    (grams)</label>
                                                 <div class="input-unit-wrapper">
-                                                    <input type="number" id="admin-weight" min="0.1" step="0.1" class="form-input" placeholder="e.g. 45.2" required>
+                                                    <input type="number" id="admin-weight" min="0.1" step="0.1"
+                                                        class="form-input" placeholder="e.g. 45.2" required>
                                                     <span class="input-unit">g</span>
                                                 </div>
                                             </div>
                                             <div class="form-group flex-1">
                                                 <label class="form-label" for="admin-time">Print Time (minutes)</label>
                                                 <div class="input-unit-wrapper">
-                                                    <input type="number" id="admin-time" min="1" step="1" class="form-input" placeholder="e.g. 185" required>
+                                                    <input type="number" id="admin-time" min="1" step="1"
+                                                        class="form-input" placeholder="e.g. 185" required>
                                                     <span class="input-unit">mins</span>
                                                 </div>
                                             </div>
                                         </div>
                                         <div class="form-group">
-                                            <label class="form-label" for="admin-labor">Post-Processing / Labor Time (hours)</label>
+                                            <label class="form-label" for="admin-labor">Post-Processing / Labor Time
+                                                (hours)</label>
                                             <div class="input-unit-wrapper">
-                                                <input type="number" id="admin-labor" min="0" step="0.1" class="form-input" value="0">
+                                                <input type="number" id="admin-labor" min="0" step="0.1"
+                                                    class="form-input" value="0">
                                                 <span class="input-unit">hrs</span>
                                             </div>
                                         </div>
@@ -300,12 +371,14 @@
                                     </form>
                                 </div>
 
-                                <div class="glass-card flex-column justify-center" style="background: rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.03);">
+                                <div class="glass-card flex-column justify-center"
+                                    style="background: rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.03);">
                                     <div id="admin-placeholder" class="admin-placeholder-state">
                                         <i class="fa-solid fa-receipt placeholder-icon"></i>
                                         <p>Input print parameters to generate detailed cost breakdown.</p>
                                     </div>
-                                    <div id="admin-result-container" class="admin-result-container hidden" style="width: 100%;">
+                                    <div id="admin-result-container" class="admin-result-container hidden"
+                                        style="width: 100%;">
                                         <div class="invoice-box">
                                             <div class="invoice-header">
                                                 <h3>Job Cost Breakdown</h3>
@@ -360,48 +433,62 @@
                         <div id="db-settings">
                             <div class="grid-2col">
                                 <div class="flex-column" style="padding: 10px;">
-                                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;"><i class="fa-solid fa-gears"></i> Core Formulas & Rates</h3>
-                                    <p class="card-subtitle" style="margin-bottom: 1.2rem;">Define custom hourly labor rates, profit margins, and machine variables.</p>
-                                    
+                                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;"><i
+                                            class="fa-solid fa-gears"></i> Core Formulas & Rates</h3>
+                                    <p class="card-subtitle" style="margin-bottom: 1.2rem;">Define custom hourly labor
+                                        rates, profit margins, and machine variables.</p>
+
                                     <form id="developer-settings-form">
                                         <div class="form-row">
                                             <div class="form-group flex-1">
-                                                <label class="form-label" for="cfg-electricity">Electricity Rate (TND/kWh)</label>
-                                                <input type="number" id="cfg-electricity" step="0.001" min="0" class="form-input">
+                                                <label class="form-label" for="cfg-electricity">Electricity Rate
+                                                    (TND/kWh)</label>
+                                                <input type="number" id="cfg-electricity" step="0.001" min="0"
+                                                    class="form-input">
                                             </div>
                                             <div class="form-group flex-1">
-                                                <label class="form-label" for="cfg-wear-tear">Wear & Tear (% of Direct Cost)</label>
+                                                <label class="form-label" for="cfg-wear-tear">Wear & Tear (% of Direct
+                                                    Cost)</label>
                                                 <div class="input-unit-wrapper">
-                                                    <input type="number" id="cfg-wear-tear" min="0" max="100" class="form-input">
+                                                    <input type="number" id="cfg-wear-tear" min="0" max="100"
+                                                        class="form-input">
                                                     <span class="input-unit">%</span>
                                                 </div>
                                             </div>
                                         </div>
                                         <div class="form-row">
                                             <div class="form-group flex-1">
-                                                <label class="form-label" for="cfg-margin">Default Profit Margin (%)</label>
+                                                <label class="form-label" for="cfg-margin">Default Profit Margin
+                                                    (%)</label>
                                                 <div class="input-unit-wrapper">
-                                                    <input type="number" id="cfg-margin" min="0" max="1000" class="form-input">
+                                                    <input type="number" id="cfg-margin" min="0" max="1000"
+                                                        class="form-input">
                                                     <span class="input-unit">%</span>
                                                 </div>
                                             </div>
                                             <div class="form-group flex-1">
-                                                <label class="form-label" for="cfg-labor">Hourly Labor Rate (TND/hr)</label>
-                                                <input type="number" id="cfg-labor" step="0.5" min="0" class="form-input">
+                                                <label class="form-label" for="cfg-labor">Hourly Labor Rate
+                                                    (TND/hr)</label>
+                                                <input type="number" id="cfg-labor" step="0.5" min="0"
+                                                    class="form-input">
                                             </div>
                                         </div>
                                         <div class="form-row">
                                             <div class="form-group flex-1">
-                                                <label class="form-label" for="cfg-infill">Assumed Mesh Infill (%)</label>
+                                                <label class="form-label" for="cfg-infill">Assumed Mesh Infill
+                                                    (%)</label>
                                                 <div class="input-unit-wrapper">
-                                                    <input type="number" id="cfg-infill" min="1" max="100" class="form-input">
+                                                    <input type="number" id="cfg-infill" min="1" max="100"
+                                                        class="form-input">
                                                     <span class="input-unit">%</span>
                                                 </div>
                                             </div>
                                             <div class="form-group flex-1">
-                                                <label class="form-label" for="cfg-support">Support Buffer Weight (%)</label>
+                                                <label class="form-label" for="cfg-support">Support Buffer Weight
+                                                    (%)</label>
                                                 <div class="input-unit-wrapper">
-                                                    <input type="number" id="cfg-support" min="0" max="100" class="form-input">
+                                                    <input type="number" id="cfg-support" min="0" max="100"
+                                                        class="form-input">
                                                     <span class="input-unit">%</span>
                                                 </div>
                                             </div>
@@ -414,10 +501,14 @@
 
                                 <div class="flex-column" style="padding: 10px; gap: 1.5rem;">
                                     <div>
-                                        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;"><i class="fa-solid fa-boxes-stacked"></i> Materials & Machines</h3>
-                                        <p class="card-subtitle" style="margin-bottom: 1.2rem;">Adjust material density/pricing and machine energy/premium overrides.</p>
-                                        
-                                        <h4 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.5rem; color: #a5b4fc;">Filament Pricing Override</h4>
+                                        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;"><i
+                                                class="fa-solid fa-boxes-stacked"></i> Materials & Machines</h3>
+                                        <p class="card-subtitle" style="margin-bottom: 1.2rem;">Adjust material
+                                            density/pricing and machine energy/premium overrides.</p>
+
+                                        <h4
+                                            style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.5rem; color: #a5b4fc;">
+                                            Filament Pricing Override</h4>
                                         <div class="table-container" style="margin-bottom: 1.2rem;">
                                             <table class="config-table">
                                                 <thead>
@@ -433,7 +524,9 @@
                                             </table>
                                         </div>
 
-                                        <h4 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.5rem; color: #a5b4fc;">Machine Tariff Overrides</h4>
+                                        <h4
+                                            style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.5rem; color: #a5b4fc;">
+                                            Machine Tariff Overrides</h4>
                                         <div class="table-container">
                                             <table class="config-table">
                                                 <thead>
@@ -457,7 +550,8 @@
                         <div id="db-keys">
                             <div class="grid-2col" style="grid-template-columns: 1.4fr 1fr; align-items: flex-start;">
                                 <div>
-                                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.8rem;">My Active Keys</h3>
+                                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.8rem;">My Active
+                                        Keys</h3>
                                     <div class="table-container">
                                         <table class="config-table">
                                             <thead>
@@ -474,13 +568,18 @@
                                         </table>
                                     </div>
                                 </div>
-                                <div style="background: rgba(255,255,255,0.02); border: 1px dashed var(--card-border); border-radius: 12px; padding: 1.2rem;">
-                                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.3rem;"><i class="fa-solid fa-plus-circle"></i> Generate API Key</h3>
-                                    <p class="card-subtitle" style="margin-bottom: 1rem; font-size: 0.8rem;">Generate a key to fetch estimates on your external website.</p>
+                                <div
+                                    style="background: rgba(255,255,255,0.02); border: 1px dashed var(--card-border); border-radius: 12px; padding: 1.2rem;">
+                                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.3rem;"><i
+                                            class="fa-solid fa-plus-circle"></i> Generate API Key</h3>
+                                    <p class="card-subtitle" style="margin-bottom: 1rem; font-size: 0.8rem;">Generate a
+                                        key to fetch estimates on your external website.</p>
                                     <form id="generate-dev-key-form">
                                         <div class="form-group">
-                                            <label class="form-label" for="dev-key-owner">Application name / Description</label>
-                                            <input type="text" id="dev-key-owner" class="form-input" required placeholder="e.g. My Bambu Slicer Shop" maxlength="50">
+                                            <label class="form-label" for="dev-key-owner">Application name /
+                                                Description</label>
+                                            <input type="text" id="dev-key-owner" class="form-input" required
+                                                placeholder="e.g. My Bambu Slicer Shop" maxlength="50">
                                         </div>
                                         <button type="submit" class="submit-btn" style="padding: 0.7rem 1rem;">
                                             <i class="fa-solid fa-plus"></i> Generate Key
@@ -492,8 +591,10 @@
 
                         <!-- Panel D: My Uploads Log -->
                         <div id="db-uploads">
-                            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.8rem;">My Integrations Upload History</h3>
-                            <p class="card-subtitle" style="margin-bottom: 1rem;">View STL model files uploaded by visitors using your API Keys.</p>
+                            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.8rem;">My Integrations
+                                Upload History</h3>
+                            <p class="card-subtitle" style="margin-bottom: 1rem;">View STL model files uploaded by
+                                visitors using your API Keys.</p>
                             <div class="table-container">
                                 <table class="config-table">
                                     <thead>
@@ -525,21 +626,29 @@
                         <h2>Super Admin Panel Locked</h2>
                         <p>Enter the Super Admin Password to manage platform variables, user accounts, and uploads.</p>
                         <div class="passcode-input-group">
-                            <input type="password" id="superadmin-passcode" class="form-input text-center" placeholder="••••••••">
-                            <button id="unlock-superadmin-btn" class="submit-btn" style="background: var(--error);"><i class="fa-solid fa-unlock"></i> Unlock</button>
+                            <input type="password" id="superadmin-passcode" class="form-input text-center"
+                                placeholder="••••••••">
+                            <button id="unlock-superadmin-btn" class="submit-btn" style="background: var(--error);"><i
+                                    class="fa-solid fa-unlock"></i> Unlock</button>
                         </div>
-                        <p id="superadmin-lock-error-text" class="error-text hidden">Invalid admin credentials. Please try again.</p>
+                        <p id="superadmin-lock-error-text" class="error-text hidden">Invalid admin credentials. Please
+                            try again.</p>
                     </div>
                 </div>
 
                 <!-- Unlocked Super Admin Dashboard -->
                 <div class="glass-card flex-column hidden" id="superadmin-dashboard-card" style="width: 100%;">
-                    <div class="dev-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+                    <div class="dev-header"
+                        style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 1rem; margin-bottom: 1.5rem;">
                         <div>
-                            <h2 class="card-title" style="font-size: 1.5rem; font-weight: 700; color: #ef4444;"><i class="fa-solid fa-user-shield"></i> Platform Management Console</h2>
-                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">Super Admin Session: <strong style="color: #ef4444;">Active</strong> <span class="badge-role admin">Super Admin</span></p>
+                            <h2 class="card-title" style="font-size: 1.5rem; font-weight: 700; color: #ef4444;"><i
+                                    class="fa-solid fa-user-shield"></i> Platform Management Console</h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">Super Admin
+                                Session: <strong style="color: #ef4444;">Active</strong> <span
+                                    class="badge-role admin">Super Admin</span></p>
                         </div>
-                        <button id="superadmin-logout-btn" class="tbl-btn btn-danger" style="padding: 0.5rem 1rem;"><i class="fa-solid fa-lock"></i> Lock Session</button>
+                        <button id="superadmin-logout-btn" class="tbl-btn btn-danger" style="padding: 0.5rem 1rem;"><i
+                                class="fa-solid fa-lock"></i> Lock Session</button>
                     </div>
 
                     <!-- Inner Super Admin Navigation -->
@@ -560,86 +669,112 @@
 
                     <!-- Super Admin Sections -->
                     <div class="dashboard-sections">
-                        
+
                         <!-- Panel A: Platform Variables (Global settings, Quick settings, Security settings) -->
                         <div id="sa-settings" class="active">
                             <form id="sa-global-settings-form">
                                 <div class="grid-2col">
                                     <div class="flex-column" style="padding: 10px;">
-                                        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; color: #67e8f9;"><i class="fa-solid fa-cube"></i> Quick Estimation Settings</h3>
-                                        <p class="card-subtitle" style="margin-bottom: 1.2rem;">Configure parameters specifically for the public quick estimator (Tunisian price calculator).</p>
+                                        <h3
+                                            style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; color: #67e8f9;">
+                                            <i class="fa-solid fa-cube"></i> Quick Estimation Settings
+                                        </h3>
+                                        <p class="card-subtitle" style="margin-bottom: 1.2rem;">Configure parameters
+                                            specifically for the public quick estimator (Tunisian price calculator).</p>
                                         <div class="form-row">
                                             <div class="form-group flex-1">
-                                                <label class="form-label" for="sa-public-infill">Public Assumed Infill (%)</label>
+                                                <label class="form-label" for="sa-public-infill">Public Assumed Infill
+                                                    (%)</label>
                                                 <div class="input-unit-wrapper">
-                                                    <input type="number" id="sa-public-infill" min="1" max="100" class="form-input">
+                                                    <input type="number" id="sa-public-infill" min="1" max="100"
+                                                        class="form-input">
                                                     <span class="input-unit">%</span>
                                                 </div>
                                             </div>
                                             <div class="form-group flex-1">
-                                                <label class="form-label" for="sa-public-support">Public Support Weight (%)</label>
+                                                <label class="form-label" for="sa-public-support">Public Support Weight
+                                                    (%)</label>
                                                 <div class="input-unit-wrapper">
-                                                    <input type="number" id="sa-public-support" min="0" max="100" class="form-input">
+                                                    <input type="number" id="sa-public-support" min="0" max="100"
+                                                        class="form-input">
                                                     <span class="input-unit">%</span>
                                                 </div>
                                             </div>
                                         </div>
                                         <div class="form-row">
                                             <div class="form-group flex-1">
-                                                <label class="form-label" for="sa-public-min-price">Public Min Price Cap (TND)</label>
+                                                <label class="form-label" for="sa-public-min-price">Public Min Price Cap
+                                                    (TND)</label>
                                                 <div class="input-unit-wrapper">
-                                                    <input type="number" id="sa-public-min-price" min="1" step="0.5" class="form-input">
+                                                    <input type="number" id="sa-public-min-price" min="1" step="0.5"
+                                                        class="form-input">
                                                     <span class="input-unit">TND</span>
                                                 </div>
                                             </div>
                                             <div class="form-group flex-1">
-                                                <label class="form-label" for="sa-public-margin">Public Margin (%)</label>
+                                                <label class="form-label" for="sa-public-margin">Public Margin
+                                                    (%)</label>
                                                 <div class="input-unit-wrapper">
-                                                    <input type="number" id="sa-public-margin" min="0" max="500" class="form-input">
+                                                    <input type="number" id="sa-public-margin" min="0" max="500"
+                                                        class="form-input">
                                                     <span class="input-unit">%</span>
                                                 </div>
                                             </div>
                                         </div>
                                         <div class="form-row">
                                             <div class="form-group flex-1">
-                                                <label class="form-label" for="sa-public-min-offset">Price Range Min Offset (%)</label>
+                                                <label class="form-label" for="sa-public-min-offset">Price Range Min
+                                                    Offset (%)</label>
                                                 <div class="input-unit-wrapper">
-                                                    <input type="number" id="sa-public-min-offset" min="10" max="100" class="form-input">
+                                                    <input type="number" id="sa-public-min-offset" min="10" max="100"
+                                                        class="form-input">
                                                     <span class="input-unit">%</span>
                                                 </div>
                                             </div>
                                             <div class="form-group flex-1">
-                                                <label class="form-label" for="sa-public-max-offset">Price Range Max Offset (%)</label>
+                                                <label class="form-label" for="sa-public-max-offset">Price Range Max
+                                                    Offset (%)</label>
                                                 <div class="input-unit-wrapper">
-                                                    <input type="number" id="sa-public-max-offset" min="100" max="300" class="form-input">
+                                                    <input type="number" id="sa-public-max-offset" min="100" max="300"
+                                                        class="form-input">
                                                     <span class="input-unit">%</span>
                                                 </div>
                                             </div>
                                         </div>
-                                        
+
                                         <!-- Security Title above the limits and cooldown fields -->
-                                        <h3 class="security-section-title"><i class="fa-solid fa-shield-halved"></i> Platform Security</h3>
-                                        <p class="card-subtitle" style="margin-bottom: 1.2rem;">Adjust rate limiting thresholds to prevent database overflow or denial of service.</p>
-                                        
+                                        <h3 class="security-section-title"><i class="fa-solid fa-shield-halved"></i>
+                                            Platform Security</h3>
+                                        <p class="card-subtitle" style="margin-bottom: 1.2rem;">Adjust rate limiting
+                                            thresholds to prevent database overflow or denial of service.</p>
+
                                         <div class="form-row">
                                             <div class="form-group flex-1">
-                                                <label class="form-label" for="sa-upload-limit">Upload Rate Limit (Scans)</label>
-                                                <input type="number" id="sa-upload-limit" min="1" step="1" class="form-input">
+                                                <label class="form-label" for="sa-upload-limit">Upload Rate Limit
+                                                    (Scans)</label>
+                                                <input type="number" id="sa-upload-limit" min="1" step="1"
+                                                    class="form-input">
                                             </div>
                                             <div class="form-group flex-1">
-                                                <label class="form-label" for="sa-upload-cooldown">Rate Limit Cooldown (Seconds)</label>
+                                                <label class="form-label" for="sa-upload-cooldown">Rate Limit Cooldown
+                                                    (Seconds)</label>
                                                 <div class="input-unit-wrapper">
-                                                    <input type="number" id="sa-upload-cooldown" min="5" step="1" class="form-input">
+                                                    <input type="number" id="sa-upload-cooldown" min="5" step="1"
+                                                        class="form-input">
                                                     <span class="input-unit">s</span>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
- 
+
                                     <div class="flex-column" style="padding: 10px;">
-                                        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; color: #67e8f9;"><i class="fa-solid fa-boxes-stacked"></i> Public Material Pricing</h3>
-                                        <p class="card-subtitle" style="margin-bottom: 1.2rem;">Define the pricing parameters of default filaments used in public estimation.</p>
-                                        
+                                        <h3
+                                            style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; color: #67e8f9;">
+                                            <i class="fa-solid fa-boxes-stacked"></i> Public Material Pricing
+                                        </h3>
+                                        <p class="card-subtitle" style="margin-bottom: 1.2rem;">Define the pricing
+                                            parameters of default filaments used in public estimation.</p>
+
                                         <div class="table-container" style="margin-bottom: 1.5rem;">
                                             <table class="config-table">
                                                 <thead>
@@ -654,8 +789,11 @@
                                                 </tbody>
                                             </table>
                                         </div>
- 
-                                        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; color: #67e8f9;"><i class="fa-solid fa-print"></i> Public Machine Tariffs</h3>
+
+                                        <h3
+                                            style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; color: #67e8f9;">
+                                            <i class="fa-solid fa-print"></i> Public Machine Tariffs
+                                        </h3>
                                         <div class="table-container" style="margin-bottom: 1.5rem;">
                                             <table class="config-table">
                                                 <thead>
@@ -671,7 +809,8 @@
                                             </table>
                                         </div>
 
-                                        <button type="submit" class="submit-btn" style="margin-top: 0.5rem; background: linear-gradient(135deg, #ef4444, #b91c1c);">
+                                        <button type="submit" class="submit-btn"
+                                            style="margin-top: 0.5rem; background: linear-gradient(135deg, #ef4444, #b91c1c);">
                                             <i class="fa-solid fa-floppy-disk"></i> Save Platform Settings
                                         </button>
                                     </div>
@@ -681,8 +820,10 @@
 
                         <!-- Panel B: User Accounts Manager -->
                         <div id="sa-users">
-                            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.8rem;">Registered Developer Accounts</h3>
-                            <p class="card-subtitle" style="margin-bottom: 1rem;">View and manage platform developer accounts. Delete users or reset their passwords.</p>
+                            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.8rem;">Registered Developer
+                                Accounts</h3>
+                            <p class="card-subtitle" style="margin-bottom: 1rem;">View and manage platform developer
+                                accounts. Delete users or reset their passwords.</p>
                             <div class="table-container">
                                 <table class="config-table">
                                     <thead>
@@ -706,7 +847,8 @@
                         <div id="sa-keys">
                             <div class="grid-2col" style="grid-template-columns: 1.4fr 1fr; align-items: flex-start;">
                                 <div>
-                                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.8rem;">All Active Keys</h3>
+                                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.8rem;">All Active
+                                        Keys</h3>
                                     <div class="table-container">
                                         <table class="config-table">
                                             <thead>
@@ -724,15 +866,21 @@
                                         </table>
                                     </div>
                                 </div>
-                                <div style="background: rgba(255,255,255,0.02); border: 1px dashed var(--card-border); border-radius: 12px; padding: 1.2rem;">
-                                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.3rem;"><i class="fa-solid fa-plus-circle"></i> Generate Super Admin Key</h3>
-                                    <p class="card-subtitle" style="margin-bottom: 1rem; font-size: 0.8rem;">Generate an API Key for your own external uses.</p>
+                                <div
+                                    style="background: rgba(255,255,255,0.02); border: 1px dashed var(--card-border); border-radius: 12px; padding: 1.2rem;">
+                                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.3rem;"><i
+                                            class="fa-solid fa-plus-circle"></i> Generate Super Admin Key</h3>
+                                    <p class="card-subtitle" style="margin-bottom: 1rem; font-size: 0.8rem;">Generate an
+                                        API Key for your own external uses.</p>
                                     <form id="generate-sa-key-form">
                                         <div class="form-group">
-                                            <label class="form-label" for="sa-key-owner">Description / Application</label>
-                                            <input type="text" id="sa-key-owner" class="form-input" required placeholder="e.g. Super Admin integration" maxlength="50">
+                                            <label class="form-label" for="sa-key-owner">Description /
+                                                Application</label>
+                                            <input type="text" id="sa-key-owner" class="form-input" required
+                                                placeholder="e.g. Super Admin integration" maxlength="50">
                                         </div>
-                                        <button type="submit" class="submit-btn" style="padding: 0.7rem 1rem; background: var(--error);">
+                                        <button type="submit" class="submit-btn"
+                                            style="padding: 0.7rem 1rem; background: var(--error);">
                                             <i class="fa-solid fa-plus"></i> Generate Admin Key
                                         </button>
                                     </form>
@@ -742,20 +890,24 @@
 
                         <!-- Panel D: Platform Uploads Log -->
                         <div id="sa-uploads">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                                 <div>
                                     <h3 style="font-size: 1.1rem; font-weight: 700;">Platform-Wide Upload Log</h3>
-                                    <p class="card-subtitle">Monitor and delete all uploaded STL mesh files across the platform.</p>
+                                    <p class="card-subtitle">Monitor and delete all uploaded STL mesh files across the
+                                        platform.</p>
                                 </div>
                                 <button id="delete-selected-uploads-btn" class="tbl-btn btn-danger hidden">
-                                    <i class="fa-solid fa-trash"></i> Delete Selected (<span id="selected-uploads-count">0</span>)
+                                    <i class="fa-solid fa-trash"></i> Delete Selected (<span
+                                        id="selected-uploads-count">0</span>)
                                 </button>
                             </div>
                             <div class="table-container">
                                 <table class="config-table">
                                     <thead>
                                         <tr>
-                                            <th style="width: 40px; text-align: center;"><input type="checkbox" id="select-all-uploads"></th>
+                                            <th style="width: 40px; text-align: center;"><input type="checkbox"
+                                                    id="select-all-uploads"></th>
                                             <th>Date Uploaded</th>
                                             <th>Filename</th>
                                             <th>Volume (cm³)</th>
@@ -775,7 +927,7 @@
                 </div>
             </section>
         </main>
-        
+
         <!-- Footer -->
         <footer class="app-footer">
             <p>&copy; 2026 Replica 3D printing & Reverse Engineering. Mahdia, Tunisia.</p>
@@ -793,11 +945,13 @@
                 <button class="modal-close-btn" id="confirm-modal-close"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="modal-body">
-                <p id="confirm-modal-text">Are you sure you want to delete the selected files? This action cannot be undone and the files will be permanently removed from disk.</p>
+                <p id="confirm-modal-text">Are you sure you want to delete the selected files? This action cannot be
+                    undone and the files will be permanently removed from disk.</p>
             </div>
             <div class="modal-footer">
                 <button id="confirm-modal-cancel-btn" class="tbl-btn">Cancel</button>
-                <button id="confirm-modal-confirm-btn" class="submit-btn save-btn" style="background: var(--error); margin: 0; padding: 0.6rem 1.2rem;">Yes, Delete</button>
+                <button id="confirm-modal-confirm-btn" class="submit-btn save-btn"
+                    style="background: var(--error); margin: 0; padding: 0.6rem 1.2rem;">Yes, Delete</button>
             </div>
         </div>
     </div>
@@ -812,4 +966,5 @@
     <!-- App Script -->
     <script src="app.js"></script>
 </body>
+
 </html>

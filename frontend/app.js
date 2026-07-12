@@ -779,11 +779,19 @@ function loadStlInViewer(arrayBuffer) {
 function setupDeveloperPortal() {
     const loginForm = document.getElementById('developer-login-form');
     const registerForm = document.getElementById('developer-register-form');
+    
     const loginTabBtn = document.getElementById('auth-login-tab-btn');
     const registerTabBtn = document.getElementById('auth-register-tab-btn');
+    const forgotLink = document.getElementById('forgot-password-link');
+    
     const logoutBtn = document.getElementById('developer-logout-btn');
     const generateDevKeyForm = document.getElementById('generate-dev-key-form');
     
+    const forgotModal = document.getElementById('forgot-password-modal');
+    const forgotModalClose = document.getElementById('forgot-modal-close');
+    const forgotModalCancel = document.getElementById('forgot-modal-cancel');
+    
+    // Auth Tab switching
     if (loginTabBtn && registerTabBtn) {
         loginTabBtn.addEventListener('click', () => {
             loginTabBtn.classList.add('active');
@@ -800,11 +808,43 @@ function setupDeveloperPortal() {
         });
     }
     
+    // Forgot password opens modal
+    if (forgotLink) {
+        forgotLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (forgotModal) {
+                forgotModal.classList.remove('hidden');
+                const emailInput = document.getElementById('forgot-email');
+                if (emailInput) emailInput.focus();
+            }
+        });
+    }
+    
+    const closeForgotModal = () => {
+        if (forgotModal) {
+            forgotModal.classList.add('hidden');
+            const forgotForm = document.getElementById('developer-forgot-form');
+            if (forgotForm) forgotForm.reset();
+        }
+    };
+    
+    if (forgotModalClose) forgotModalClose.addEventListener('click', closeForgotModal);
+    if (forgotModalCancel) forgotModalCancel.addEventListener('click', closeForgotModal);
+    
+    // Close modal when clicking outside
+    if (forgotModal) {
+        forgotModal.addEventListener('click', (e) => {
+            if (e.target === forgotModal) closeForgotModal();
+        });
+    }
+    
+    // Registration submission
     if (registerForm) {
         registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const payload = {
                 username: document.getElementById('register-username').value,
+                email: document.getElementById('register-email').value,
                 password: document.getElementById('register-password').value
             };
             try {
@@ -815,9 +855,9 @@ function setupDeveloperPortal() {
                 });
                 const data = await response.json();
                 if (response.ok) {
-                    showToast(data.message || 'Registration successful!', 'success');
+                    showToast(data.message || 'Registration successful! Verification email sent.', 'success');
                     registerForm.reset();
-                    loginTabBtn.click();
+                    if (loginTabBtn) loginTabBtn.click();
                 } else {
                     showToast(data.detail || 'Registration failed.', 'error');
                 }
@@ -828,11 +868,12 @@ function setupDeveloperPortal() {
         });
     }
     
+    // Login submission
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const payload = {
-                username: document.getElementById('login-username').value,
+                identity: document.getElementById('login-identity').value,
                 password: document.getElementById('login-password').value
             };
             try {
@@ -858,6 +899,35 @@ function setupDeveloperPortal() {
         });
     }
     
+    // Forgot Password submission
+    const forgotForm = document.getElementById('developer-forgot-form');
+    if (forgotForm) {
+        forgotForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const payload = {
+                email: document.getElementById('forgot-email').value
+            };
+            try {
+                const response = await fetch('/api/auth/forgot-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    showToast(data.message || 'If registered, reset link has been emailed.', 'success');
+                    closeForgotModal();
+                } else {
+                    showToast(data.detail || 'Failed to send reset link.', 'error');
+                }
+            } catch (err) {
+                console.error('Error during forgot password request:', err);
+                showToast('Network error.', 'error');
+            }
+        });
+    }
+    
+    // Logout click
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
             const token = localStorage.getItem('replica_dev_token');
@@ -877,6 +947,7 @@ function setupDeveloperPortal() {
         });
     }
     
+    // Generate Developer Key submission
     if (generateDevKeyForm) {
         generateDevKeyForm.addEventListener('submit', async (e) => {
             e.preventDefault();

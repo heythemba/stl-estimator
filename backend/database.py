@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 # Database Configuration
 # Default to local SQLite, but can be overridden by DATABASE_URL (e.g. Supabase/PostgreSQL)
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///replica_estimator_v2.db")
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///replica_estimator_v4.db")
 
 # For SQLite, we need to allow multithreading, but PostgreSQL doesn't need it.
 connect_args = {}
@@ -21,7 +21,12 @@ class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     username = Column(String, unique=True, index=True, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
+    is_active = Column(Boolean, default=False, nullable=False)
+    activation_token = Column(String, nullable=True)
+    reset_token = Column(String, nullable=True)
+    reset_token_expires = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 class UserSession(Base):

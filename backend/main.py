@@ -455,15 +455,53 @@ def update_settings(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update settings: {str(e)}"
         )
+# Resend API configuration
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "re_PBbRoq9j_4JZLgZQ1RmtYUNRZT5S5GmGA")
+
+def send_resend_email(to_email: str, subject: str, html_content: str) -> bool:
+    """
+    Sends an email using Resend REST API.
+    """
+    url = "https://api.resend.com/emails"
+    headers = {
+        "Authorization": f"Bearer {RESEND_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "from": "Replica Estimator <onboarding@resend.dev>",
+        "to": [to_email],
+        "subject": subject,
+        "html": html_content
+    }
+    try:
+        import requests
+        response = requests.post(url, json=payload, headers=headers)
+        if response.status_code in [200, 201]:
+            print(f"[Resend Email] Successfully sent email to {to_email}")
+            return True
+        else:
+            print(f"[Resend Email Error] API responded with status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        print(f"[Resend Email Error] Failed to connect to Resend API: {e}")
+        return False
 
 # Developer Authentication Schema
 class RegisterRequest(BaseModel):
     username: str
+    email: str
     password: str
     
 class LoginRequest(BaseModel):
-    username: str
+    identity: str  # username or email
     password: str
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
 
 # Developer API Keys Schema
 class CreateDeveloperKeyRequest(BaseModel):
@@ -480,19 +518,36 @@ class ToggleKeyRequest(BaseModel):
 # --- Developer Authentication Endpoints ---
 
 @app.post("/api/auth/register")
-def register_developer(req: RegisterRequest, db: Session = Depends(get_db)):
+def register_developer(req: RegisterRequest, request: Request, db: Session = Depends(get_db)):
     username_clean = req.username.strip()
+    email_clean = req.email.strip().lower()
+    
     if not username_clean:
         raise HTTPException(status_code=400, detail="Username cannot be empty.")
+    if not email_clean:
+        raise HTTPException(status_code=400, detail="Email cannot be empty.")
     if len(req.password) < 6:
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
         
-    existing = db.query(User).filter(User.username == username_clean).first()
-    if existing:
+    existing_user = db.query(User).filter(User.username == username_clean).first()
+    if existing_user:
         raise HTTPException(status_code=400, detail="Username is already taken.")
         
+    existing_email = db.query(User).filter(User.email == email_clean).first()
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email address is already registered.")
+        
+    # Generate activation token
+    activation_token = secrets.token_hex(20)
     hashed = hash_password(req.password)
-    new_user = User(username=username_clean, hashed_password=hashed)
+    
+    new_user = User(
+        username=username_clean,
+        email=email_clean,
+        hashed_password=hashed,
+        is_active=False,
+        activation_token=activation_token
+    )
     db.add(new_user)
     db.commit()
     
@@ -516,20 +571,171 @@ def register_developer(req: RegisterRequest, db: Session = Depends(get_db)):
     db.add(UserMachine(user_id=new_user.id, machine_id="h2s", name="H2S", power_watts=350.0, flat_premium=15.0))
     
     db.commit()
-    return {"success": True, "message": "Account created successfully. You can now log in."}
+    
+    # Send verification email
+    base_url = str(request.base_url).rstrip("/")
+    activation_link = f"{base_url}/api/auth/activate?token={activation_token}"
+    
+    # Log to terminal for easy copy-paste
+    print(f"\n[SIGNUP ACTIVATION LINK] User: {username_clean} | Link: {activation_link}\n")
+    
+    email_html = f"""
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; color: #1a202c;">
+        <h2 style="color: #4f46e5; margin-bottom: 20px;">Welcome to Replica Cost Estimator!</h2>
+        <p>Thank you for registering. Please click the button below to verify your email and activate your account:</p>
+        <p style="margin: 30px 0; text-align: center;">
+            <a href="{activation_link}" style="display: inline-block; background: #4f46e5; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Verify & Activate Account</a>
+        </p>
+        <p style="font-size: 0.85rem; color: #718096;">If the button doesn't work, copy and paste this URL into your browser:</p>
+        <p style="font-size: 0.85rem; color: #4f46e5; word-break: break-all; background: #f7fafc; padding: 10px; border-radius: 6px; font-family: monospace;">{activation_link}</p>
+        <br>
+        <p style="border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 0.9rem; color: #4a5568;">Regards,<br><strong>Replica Team</strong></p>
+    </div>
+    """
+    
+    send_resend_email(email_clean, "Verify Your Email - Replica Estimator", email_html)
+    
+    return {"success": True, "message": "Account created! Please check your email to verify and activate your account."}
+
+from fastapi.responses import HTMLResponse
+
+@app.get("/api/auth/activate", response_class=HTMLResponse)
+def activate_account(token: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.activation_token == token).first()
+    if not user:
+        return """
+        <html>
+            <head>
+                <title>Activation Failed</title>
+                <style>
+                    body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                    .card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); padding: 2.5rem; border-radius: 16px; max-width: 450px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+                    h1 { color: #f43f5e; margin-bottom: 1rem; }
+                    p { color: #94a3b8; line-height: 1.6; margin-bottom: 2rem; }
+                    .btn { background: #3b82f6; color: white; padding: 0.8rem 1.5rem; text-decoration: none; border-radius: 8px; font-weight: 600; transition: 0.2s; }
+                    .btn:hover { background: #2563eb; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <h1>Activation Link Invalid</h1>
+                    <p>The activation link is invalid or has already been used. Please try registering again or contact support.</p>
+                    <a href="/" class="btn">Go to Home Page</a>
+                </div>
+            </body>
+        </html>
+        """
+        
+    user.is_active = True
+    user.activation_token = None
+    db.commit()
+    
+    return """
+    <html>
+        <head>
+            <title>Activation Successful</title>
+            <style>
+                body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                .card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); padding: 2.5rem; border-radius: 16px; max-width: 450px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+                h1 { color: #10b981; margin-bottom: 1rem; }
+                p { color: #94a3b8; line-height: 1.6; margin-bottom: 2rem; }
+                .btn { background: #10b981; color: white; padding: 0.8rem 1.5rem; text-decoration: none; border-radius: 8px; font-weight: 600; transition: 0.2s; }
+                .btn:hover { background: #059669; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h1>Account Activated!</h1>
+                <p>Your email address has been successfully verified. You can now log in to the Developer Portal using your credentials.</p>
+                <a href="/" class="btn">Go to Login</a>
+            </div>
+        </body>
+    </html>
+    """
 
 @app.post("/api/auth/login")
 def login_developer(req: LoginRequest, db: Session = Depends(get_db)):
-    username_clean = req.username.strip()
-    user = db.query(User).filter(User.username == username_clean).first()
+    identity_clean = req.identity.strip()
+    user = db.query(User).filter(
+        (User.username == identity_clean) | (User.email == identity_clean.lower())
+    ).first()
+    
     if not user or not verify_password(req.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid username or password.")
+        raise HTTPException(status_code=401, detail="Invalid username/email or password.")
+        
+    if not user.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="Please verify your email address to activate your account."
+        )
         
     token = f"sess_{secrets.token_hex(24)}"
     session = UserSession(token=token, user_id=user.id)
     db.add(session)
     db.commit()
     return {"success": True, "token": token, "username": user.username}
+
+@app.post("/api/auth/forgot-password")
+def forgot_password(req: ForgotPasswordRequest, request: Request, db: Session = Depends(get_db)):
+    email_clean = req.email.strip().lower()
+    user = db.query(User).filter(User.email == email_clean).first()
+    
+    # For security reasons, don't reveal if user exists or not
+    if not user:
+        return {"success": True, "message": "If that email is registered, we have sent a reset link."}
+        
+    reset_token = secrets.token_hex(20)
+    user.reset_token = reset_token
+    user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+    db.commit()
+    
+    base_url = str(request.base_url).rstrip("/")
+    reset_link = f"{base_url}/reset-password.html?token={reset_token}"
+    
+    # Log to terminal for easy copy-paste
+    print(f"\n[PASSWORD RESET LINK] User: {user.username} | Link: {reset_link}\n")
+    
+    email_html = f"""
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; color: #1a202c;">
+        <h2 style="color: #059669; margin-bottom: 20px;">Password Reset Request</h2>
+        <p>We received a request to reset your password. Click the button below to set a new password:</p>
+        <p style="margin: 30px 0; text-align: center;">
+            <a href="{reset_link}" style="display: inline-block; background: #059669; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Reset Password</a>
+        </p>
+        <p style="font-size: 0.85rem; color: #718096;">If the button doesn't work, copy and paste this URL into your browser:</p>
+        <p style="font-size: 0.85rem; color: #059669; word-break: break-all; background: #f7fafc; padding: 10px; border-radius: 6px; font-family: monospace;">{reset_link}</p>
+        <p style="font-size: 0.8rem; color: #a0aec0; margin-top: 10px;">This reset link is valid for 1 hour.</p>
+        <br>
+        <p style="border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 0.9rem; color: #4a5568;">Regards,<br><strong>Replica Team</strong></p>
+    </div>
+    """
+    
+    send_resend_email(email_clean, "Reset Your Password - Replica Estimator", email_html)
+    
+    return {"success": True, "message": "If that email is registered, we have sent a reset link."}
+
+@app.post("/api/auth/reset-password")
+def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(
+        User.reset_token == req.token,
+        User.reset_token_expires > datetime.utcnow()
+    ).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=400,
+            detail="Reset token is invalid or has expired."
+        )
+        
+    if len(req.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+        
+    user.hashed_password = hash_password(req.new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    db.commit()
+    
+    return {"success": True, "message": "Password reset successfully. You can now log in."}
 
 @app.post("/api/auth/logout")
 def logout_developer(
