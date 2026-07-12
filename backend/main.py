@@ -187,7 +187,35 @@ class SettingsUpdateRequest(BaseModel):
 # API Endpoints
 
 @app.post("/api/estimate/scan")
-async def scan_stl_file(file: UploadFile = File(...)):
+async def scan_stl_file(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    # Rate Limiting Check
+    limit_count_setting = db.query(GlobalSetting).filter(GlobalSetting.key == "upload_limit_count").first()
+    cooldown_setting = db.query(GlobalSetting).filter(GlobalSetting.key == "upload_cooldown_seconds").first()
+    
+    limit_count = int(limit_count_setting.value) if limit_count_setting else 5
+    cooldown_secs = int(cooldown_setting.value) if cooldown_setting else 60
+    
+    now = datetime.now()
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # Filter out timestamps older than cooldown_secs
+    cooldown_delta = timedelta(seconds=cooldown_secs)
+    upload_tracker[client_ip] = [t for t in upload_tracker[client_ip] if now - t < cooldown_delta]
+    
+    if len(upload_tracker[client_ip]) >= limit_count:
+        oldest_time = upload_tracker[client_ip][0]
+        wait_time = int(cooldown_secs - (now - oldest_time).total_seconds())
+        wait_time = max(1, wait_time)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Upload limit reached. Please wait {wait_time} seconds before uploading again.",
+            headers={"Retry-After": str(wait_time)}
+        )
+
     if not file.filename.lower().endswith('.stl'):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -246,7 +274,8 @@ async def public_estimate(
         wait_time = max(1, wait_time)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Upload limit reached. Please wait {wait_time} seconds before uploading again."
+            detail=f"Upload limit reached. Please wait {wait_time} seconds before uploading again.",
+            headers={"Retry-After": str(wait_time)}
         )
 
     if not file.filename.lower().endswith('.stl'):
@@ -385,7 +414,9 @@ def get_settings(db: Session = Depends(get_db)):
                 "id": m.id,
                 "name": m.name,
                 "power_watts": m.power_watts,
-                "flat_premium": m.flat_premium
+                "flat_premium": m.flat_premium,
+                "provider": m.provider,
+                "enclosed": m.enclosed
             } for m in machines
         ],
         "time_brackets": [
@@ -417,34 +448,48 @@ def update_settings(
             else:
                 db.add(GlobalSetting(key=key, value=val))
                 
-        # Update materials
+        # Sync materials
+        incoming_mat_ids = {mat_data["id"].lower() for mat_data in request.materials}
+        db.query(Material).filter(~Material.id.in_(incoming_mat_ids)).delete(synchronize_session=False)
+        
         for mat_data in request.materials:
-            mat = db.query(Material).filter(Material.id == mat_data["id"]).first()
+            mat_id = mat_data["id"].lower()
+            mat = db.query(Material).filter(Material.id == mat_id).first()
             if mat:
                 mat.name = mat_data["name"]
                 mat.density_g_cm3 = mat_data["density_g_cm3"]
                 mat.price_per_kg = mat_data["price_per_kg"]
             else:
                 db.add(Material(
-                    id=mat_data["id"], 
+                    id=mat_id, 
                     name=mat_data["name"], 
                     density_g_cm3=mat_data["density_g_cm3"], 
                     price_per_kg=mat_data["price_per_kg"]
                 ))
                 
-        # Update machines
+        # Sync machines
+        incoming_mach_ids = {mach_data["id"].lower() for mach_data in request.machines}
+        db.query(Machine).filter(~Machine.id.in_(incoming_mach_ids)).delete(synchronize_session=False)
+        # Cascade delete time brackets of deleted machines
+        db.query(TimeBracket).filter(~TimeBracket.machine_id.in_(incoming_mach_ids)).delete(synchronize_session=False)
+        
         for mach_data in request.machines:
-            mach = db.query(Machine).filter(Machine.id == mach_data["id"]).first()
+            mach_id = mach_data["id"].lower()
+            mach = db.query(Machine).filter(Machine.id == mach_id).first()
             if mach:
                 mach.name = mach_data["name"]
                 mach.power_watts = mach_data["power_watts"]
                 mach.flat_premium = mach_data["flat_premium"]
+                mach.provider = mach_data.get("provider")
+                mach.enclosed = mach_data.get("enclosed", False)
             else:
                 db.add(Machine(
-                    id=mach_data["id"], 
+                    id=mach_id, 
                     name=mach_data["name"], 
                     power_watts=mach_data["power_watts"], 
-                    flat_premium=mach_data["flat_premium"]
+                    flat_premium=mach_data["flat_premium"],
+                    provider=mach_data.get("provider"),
+                    enclosed=mach_data.get("enclosed", False)
                 ))
                 
         db.commit()
@@ -562,13 +607,9 @@ def register_developer(req: RegisterRequest, request: Request, db: Session = Dep
     # Seed default user materials
     db.add(UserMaterial(user_id=new_user.id, material_id="pla", name="PLA", density_g_cm3=1.24, price_per_kg=60.0))
     db.add(UserMaterial(user_id=new_user.id, material_id="petg", name="PETG", density_g_cm3=1.27, price_per_kg=65.0))
-    db.add(UserMaterial(user_id=new_user.id, material_id="abs", name="ABS", density_g_cm3=1.04, price_per_kg=70.0))
-    db.add(UserMaterial(user_id=new_user.id, material_id="asa", name="ASA", density_g_cm3=1.07, price_per_kg=75.0))
-    db.add(UserMaterial(user_id=new_user.id, material_id="tpu", name="TPU", density_g_cm3=1.21, price_per_kg=85.0))
     
     # Seed default user machines
-    db.add(UserMachine(user_id=new_user.id, machine_id="a1_combo", name="A1 Combo", power_watts=150.0, flat_premium=0.0))
-    db.add(UserMachine(user_id=new_user.id, machine_id="h2s", name="H2S", power_watts=350.0, flat_premium=15.0))
+    db.add(UserMachine(user_id=new_user.id, machine_id="a1_combo", name="A1 Combo", power_watts=150.0, flat_premium=0.0, provider="Bambulab", enclosed=False))
     
     db.commit()
     
@@ -835,16 +876,12 @@ def get_developer_settings(
     if not materials:
         db.add(UserMaterial(user_id=current_user.id, material_id="pla", name="PLA", density_g_cm3=1.24, price_per_kg=60.0))
         db.add(UserMaterial(user_id=current_user.id, material_id="petg", name="PETG", density_g_cm3=1.27, price_per_kg=65.0))
-        db.add(UserMaterial(user_id=current_user.id, material_id="abs", name="ABS", density_g_cm3=1.04, price_per_kg=70.0))
-        db.add(UserMaterial(user_id=current_user.id, material_id="asa", name="ASA", density_g_cm3=1.07, price_per_kg=75.0))
-        db.add(UserMaterial(user_id=current_user.id, material_id="tpu", name="TPU", density_g_cm3=1.21, price_per_kg=85.0))
         seeded_any = True
         materials = db.query(UserMaterial).filter(UserMaterial.user_id == current_user.id).all()
         
     machines = db.query(UserMachine).filter(UserMachine.user_id == current_user.id).all()
     if not machines:
-        db.add(UserMachine(user_id=current_user.id, machine_id="a1_combo", name="A1 Combo", power_watts=150.0, flat_premium=0.0))
-        db.add(UserMachine(user_id=current_user.id, machine_id="h2s", name="H2S", power_watts=350.0, flat_premium=15.0))
+        db.add(UserMachine(user_id=current_user.id, machine_id="a1_combo", name="A1 Combo", power_watts=150.0, flat_premium=0.0, provider="Bambulab", enclosed=False))
         seeded_any = True
         machines = db.query(UserMachine).filter(UserMachine.user_id == current_user.id).all()
         
@@ -866,7 +903,9 @@ def get_developer_settings(
                 "id": m.machine_id,
                 "name": m.name,
                 "power_watts": m.power_watts,
-                "flat_premium": m.flat_premium
+                "flat_premium": m.flat_premium,
+                "provider": m.provider,
+                "enclosed": m.enclosed
             } for m in machines
         ]
     }
@@ -882,6 +921,7 @@ def save_developer_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # 1. Update global settings
     for key, val in req.global_settings.items():
         setting = db.query(UserSetting).filter(UserSetting.user_id == current_user.id, UserSetting.key == key).first()
         if setting:
@@ -889,17 +929,61 @@ def save_developer_settings(
         else:
             db.add(UserSetting(user_id=current_user.id, key=key, value=val))
             
+    # 2. Sync materials
+    incoming_mat_ids = {mat["id"].lower() for mat in req.materials}
+    db.query(UserMaterial).filter(
+        UserMaterial.user_id == current_user.id,
+        ~UserMaterial.material_id.in_(incoming_mat_ids)
+    ).delete(synchronize_session=False)
+    
     for mat in req.materials:
-        material = db.query(UserMaterial).filter(UserMaterial.user_id == current_user.id, UserMaterial.material_id == mat["id"].lower()).first()
+        mat_id = mat["id"].lower()
+        material = db.query(UserMaterial).filter(
+            UserMaterial.user_id == current_user.id,
+            UserMaterial.material_id == mat_id
+        ).first()
         if material:
             material.density_g_cm3 = mat["density_g_cm3"]
             material.price_per_kg = mat["price_per_kg"]
+            material.name = mat.get("name", material.name)
+        else:
+            db.add(UserMaterial(
+                user_id=current_user.id,
+                material_id=mat_id,
+                name=mat.get("name", mat_id.upper()),
+                density_g_cm3=mat["density_g_cm3"],
+                price_per_kg=mat["price_per_kg"]
+            ))
             
+    # 3. Sync machines
+    incoming_mach_ids = {mach["id"].lower() for mach in req.machines}
+    db.query(UserMachine).filter(
+        UserMachine.user_id == current_user.id,
+        ~UserMachine.machine_id.in_(incoming_mach_ids)
+    ).delete(synchronize_session=False)
+    
     for mach in req.machines:
-        machine = db.query(UserMachine).filter(UserMachine.user_id == current_user.id, UserMachine.machine_id == mach["id"].lower()).first()
+        mach_id = mach["id"].lower()
+        machine = db.query(UserMachine).filter(
+            UserMachine.user_id == current_user.id,
+            UserMachine.machine_id == mach_id
+        ).first()
         if machine:
             machine.power_watts = mach["power_watts"]
             machine.flat_premium = mach["flat_premium"]
+            machine.name = mach.get("name", machine.name)
+            machine.provider = mach.get("provider")
+            machine.enclosed = mach.get("enclosed", False)
+        else:
+            db.add(UserMachine(
+                user_id=current_user.id,
+                machine_id=mach_id,
+                name=mach.get("name", mach_id.upper()),
+                power_watts=mach["power_watts"],
+                flat_premium=mach["flat_premium"],
+                provider=mach.get("provider"),
+                enclosed=mach.get("enclosed", False)
+            ))
             
     db.commit()
     return {"success": True}
@@ -952,6 +1036,7 @@ def get_admin_users(
         results.append({
             "id": u.id,
             "username": u.username,
+            "email": u.email,
             "created_at": u.created_at.isoformat() if u.created_at else None,
             "keys_count": keys_count,
             "total_calls": total_calls

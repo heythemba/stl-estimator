@@ -1,6 +1,9 @@
 // Global State
 let materials = [];
 let machines = [];
+let saMaterials = [];
+let saMachines = [];
+let addModalMode = 'dev';
 let globalSettings = {};
 let selectedPublicMaterialId = 'pla';
 let activeStlFile = null;
@@ -25,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initThreeJS();
     setupConfirmModalListeners();
     setupBulkDelete();
+    setupCustomButtons();
 });
 
 // 1. Navigation Setup
@@ -269,6 +273,17 @@ function triggerStlScan(file) {
             const calcBtn = document.getElementById('public-calculate-btn');
             if (calcBtn) calcBtn.classList.remove('hidden');
             
+        } else if (xhr.status === 429) {
+            let waitSecs = 60;
+            const retryAfter = xhr.getResponseHeader('Retry-After');
+            if (retryAfter) {
+                waitSecs = parseInt(retryAfter, 10);
+            } else {
+                const match = detail.match(/\d+/);
+                if (match) waitSecs = parseInt(match[0], 10);
+            }
+            handleRateLimit(waitSecs);
+            resetPublicEstimator();
         } else {
             progressBar.style.backgroundColor = 'var(--error)';
             statusText.innerText = 'Error: ' + detail;
@@ -321,6 +336,17 @@ function triggerEstimation(file) {
             displayPublicResults(result);
             // Show Calculate button again for recalculate
             if (calcBtn) calcBtn.classList.remove('hidden');
+        } else if (xhr.status === 429) {
+            let waitSecs = 60;
+            const retryAfter = xhr.getResponseHeader('Retry-After');
+            if (retryAfter) {
+                waitSecs = parseInt(retryAfter, 10);
+            } else {
+                const match = detail.match(/\d+/);
+                if (match) waitSecs = parseInt(match[0], 10);
+            }
+            handleRateLimit(waitSecs);
+            resetPublicEstimator();
         } else {
             showToast(detail, 'error');
             // Restore UI so user can retry
@@ -1119,13 +1145,17 @@ async function saveDeveloperSettings() {
     machRows.forEach(row => {
         const powerInput = row.querySelector('.mach-power');
         const premiumInput = row.querySelector('.mach-premium');
+        const providerInput = row.querySelector('.mach-provider');
+        const enclosedInput = row.querySelector('.mach-enclosed');
         const id = powerInput.getAttribute('data-id');
         const name = row.querySelector('td').innerText;
         machinesPayload.push({
             id: id,
             name: name,
+            provider: providerInput ? providerInput.value.trim() : '',
             power_watts: parseFloat(powerInput.value),
-            flat_premium: parseFloat(premiumInput.value)
+            flat_premium: parseFloat(premiumInput.value),
+            enclosed: enclosedInput ? enclosedInput.checked : false
         });
     });
     
@@ -1219,9 +1249,14 @@ function populateSettingsFields(data) {
     data.materials.forEach(mat => {
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td style="font-weight: 700;">${mat.name}</td>
+            <td style="font-weight: 700;">${escapeHtml(mat.name)}</td>
             <td><input type="number" step="0.01" class="tbl-input mat-density" data-id="${mat.id}" value="${mat.density_g_cm3}"></td>
             <td><input type="number" step="1" class="tbl-input mat-price" data-id="${mat.id}" value="${mat.price_per_kg}"></td>
+            <td style="text-align: center;">
+                <button type="button" class="tbl-btn btn-danger delete-material-btn" data-id="${mat.id}" title="Delete Filament" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </td>
         `;
         matTbody.appendChild(row);
     });
@@ -1231,11 +1266,35 @@ function populateSettingsFields(data) {
     data.machines.forEach(mach => {
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td style="font-weight: 700;">${mach.name}</td>
+            <td style="font-weight: 700;">${escapeHtml(mach.name)}</td>
+            <td><input type="text" class="tbl-input mach-provider" data-id="${mach.id}" value="${escapeHtml(mach.provider || '')}" placeholder="e.g. Bambulab"></td>
             <td><input type="number" step="10" class="tbl-input mach-power" data-id="${mach.id}" value="${mach.power_watts}"></td>
             <td><input type="number" step="1" class="tbl-input mach-premium" data-id="${mach.id}" value="${mach.flat_premium}"></td>
+            <td style="text-align: center;">
+                <input type="checkbox" class="mach-enclosed" data-id="${mach.id}" ${mach.enclosed ? 'checked' : ''} style="cursor: pointer; width: auto; transform: scale(1.1);">
+            </td>
+            <td style="text-align: center;">
+                <button type="button" class="tbl-btn btn-danger delete-machine-btn" data-id="${mach.id}" title="Delete Machine" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </td>
         `;
         machTbody.appendChild(row);
+    });
+    
+    // Bind Delete listeners
+    matTbody.querySelectorAll('.delete-material-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-id');
+            deleteLocalMaterial(id);
+        });
+    });
+    
+    machTbody.querySelectorAll('.delete-machine-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-id');
+            deleteLocalMachine(id);
+        });
     });
 }
 
@@ -1365,29 +1424,9 @@ async function loadSuperAdminSettings() {
             document.getElementById('sa-upload-limit').value = cfg.upload_limit_count !== undefined ? cfg.upload_limit_count : 5;
             document.getElementById('sa-upload-cooldown').value = cfg.upload_cooldown_seconds !== undefined ? cfg.upload_cooldown_seconds : 60;
             
-            const matTbody = document.getElementById('sa-materials-tbody');
-            matTbody.innerHTML = '';
-            data.materials.forEach(mat => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td style="font-weight: 700;">${mat.name}</td>
-                    <td><input type="number" step="0.01" class="tbl-input sa-mat-density" data-id="${mat.id}" value="${mat.density_g_cm3}"></td>
-                    <td><input type="number" step="1" class="tbl-input sa-mat-price" data-id="${mat.id}" value="${mat.price_per_kg}"></td>
-                `;
-                matTbody.appendChild(row);
-            });
-            
-            const machTbody = document.getElementById('sa-machines-tbody');
-            machTbody.innerHTML = '';
-            data.machines.forEach(mach => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td style="font-weight: 700;">${mach.name}</td>
-                    <td><input type="number" step="10" class="tbl-input sa-mach-power" data-id="${mach.id}" value="${mach.power_watts}"></td>
-                    <td><input type="number" step="1" class="tbl-input sa-mach-premium" data-id="${mach.id}" value="${mach.flat_premium}"></td>
-                `;
-                machTbody.appendChild(row);
-            });
+            saMaterials = data.materials;
+            saMachines = data.machines;
+            renderSaMaterialsAndMachines(saMaterials, saMachines);
         }
     } catch (err) {
         console.error('Failed to load Super Admin settings:', err);
@@ -1430,14 +1469,18 @@ async function saveSuperAdminSettings() {
     machRows.forEach(row => {
         const powerInput = row.querySelector('.sa-mach-power');
         const premiumInput = row.querySelector('.sa-mach-premium');
+        const providerInput = row.querySelector('.sa-mach-provider');
+        const enclosedInput = row.querySelector('.sa-mach-enclosed');
         if (powerInput && premiumInput) {
             const id = powerInput.getAttribute('data-id');
             const name = row.querySelector('td').innerText;
             machinesPayload.push({
                 id: id,
                 name: name,
+                provider: providerInput ? providerInput.value.trim() : '',
                 power_watts: parseFloat(powerInput.value),
-                flat_premium: parseFloat(premiumInput.value)
+                flat_premium: parseFloat(premiumInput.value),
+                enclosed: enclosedInput ? enclosedInput.checked : false
             });
         }
     });
@@ -1492,7 +1535,7 @@ function renderSuperAdminUsersTable(users) {
     tbody.innerHTML = '';
     
     if (users.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No user accounts registered yet.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No user accounts registered yet.</td></tr>`;
         return;
     }
     
@@ -1503,6 +1546,7 @@ function renderSuperAdminUsersTable(users) {
         row.innerHTML = `
             <td>${u.id}</td>
             <td style="font-weight: 700;">${escapeHtml(u.username)}</td>
+            <td>${escapeHtml(u.email || '')}</td>
             <td>${date}</td>
             <td style="text-align: center; font-weight: 600;">${u.keys_count}</td>
             <td style="text-align: center; font-weight: 600; color: #a5b4fc;">${u.total_calls}</td>
@@ -1917,5 +1961,336 @@ function showToast(message, type = 'success') {
             toast.remove();
         }, 300);
     }, 4000);
+}
+
+// Rate Limiting timer & helpers
+let rateLimitInterval = null;
+function handleRateLimit(waitSecs) {
+    if (rateLimitInterval) clearInterval(rateLimitInterval);
+    
+    const overlay = document.getElementById('rate-limit-overlay');
+    const timerSpan = document.getElementById('rate-limit-timer');
+    const fileInput = document.getElementById('stl-file-input');
+    const uploadZone = document.getElementById('upload-zone');
+    
+    if (overlay && timerSpan) {
+        overlay.classList.remove('hidden');
+        if (uploadZone) uploadZone.classList.add('rate-limited');
+        if (fileInput) fileInput.disabled = true;
+        
+        let remaining = waitSecs;
+        timerSpan.innerText = remaining;
+        
+        rateLimitInterval = setInterval(() => {
+            remaining--;
+            if (remaining <= 0) {
+                clearInterval(rateLimitInterval);
+                rateLimitInterval = null;
+                overlay.classList.add('hidden');
+                if (uploadZone) uploadZone.classList.remove('rate-limited');
+                if (fileInput) fileInput.disabled = false;
+                
+                resetPublicEstimator();
+            } else {
+                timerSpan.innerText = remaining;
+            }
+        }, 1000);
+    }
+    showToast(`Rate limit reached. Please wait ${waitSecs} seconds before uploading.`, 'error');
+}
+
+// Custom Settings Customization
+function deleteLocalMaterial(id) {
+    if (materials.length <= 1) {
+        showToast('You must keep at least one filament.', 'error');
+        return;
+    }
+    const mat = materials.find(m => m.id === id);
+    if (!mat) return;
+    if (confirm(`Are you sure you want to delete filament '${mat.name}'?`)) {
+        materials = materials.filter(m => m.id !== id);
+        populateSettingsFields({
+            global_settings: getLocalGlobalSettings(),
+            materials: materials,
+            machines: machines
+        });
+    }
+}
+
+function deleteLocalMachine(id) {
+    if (machines.length <= 1) {
+        showToast('You must keep at least one machine.', 'error');
+        return;
+    }
+    const mach = machines.find(m => m.id === id);
+    if (!mach) return;
+    if (confirm(`Are you sure you want to delete machine '${mach.name}'?`)) {
+        machines = machines.filter(m => m.id !== id);
+        populateSettingsFields({
+            global_settings: getLocalGlobalSettings(),
+            materials: materials,
+            machines: machines
+        });
+    }
+}
+
+function getLocalGlobalSettings() {
+    return {
+        electricity_rate: parseFloat(document.getElementById('cfg-electricity').value || 0),
+        wear_tear_percent: parseFloat(document.getElementById('cfg-wear-tear').value || 0),
+        margin_percent: parseFloat(document.getElementById('cfg-margin').value || 0),
+        labor_rate_hourly: parseFloat(document.getElementById('cfg-labor').value || 0),
+        infill_ratio: parseFloat(document.getElementById('cfg-infill').value || 0),
+        support_buffer_percent: parseFloat(document.getElementById('cfg-support').value || 0)
+    };
+}
+
+function setupCustomButtons() {
+    // Modal Elements
+    const filamentModal = document.getElementById('add-filament-modal');
+    const closeFilamentModal = document.getElementById('close-add-filament-modal');
+    const cancelFilamentBtn = document.getElementById('cancel-add-filament-btn');
+    const filamentForm = document.getElementById('add-filament-form');
+    
+    const machineModal = document.getElementById('add-machine-modal');
+    const closeMachineModal = document.getElementById('close-add-machine-modal');
+    const cancelMachineBtn = document.getElementById('cancel-add-machine-btn');
+    const machineForm = document.getElementById('add-machine-form');
+
+    // Helper to close modals
+    const closeFilament = () => {
+        if (filamentModal) filamentModal.classList.add('hidden');
+        if (filamentForm) filamentForm.reset();
+    };
+    
+    const closeMachine = () => {
+        if (machineModal) machineModal.classList.add('hidden');
+        if (machineForm) machineForm.reset();
+    };
+
+    // Close listeners
+    if (closeFilamentModal) closeFilamentModal.addEventListener('click', closeFilament);
+    if (cancelFilamentBtn) cancelFilamentBtn.addEventListener('click', closeFilament);
+    if (closeMachineModal) closeMachineModal.addEventListener('click', closeMachine);
+    if (cancelMachineBtn) cancelMachineBtn.addEventListener('click', closeMachine);
+
+    // Open Filament Modal (Dev & SA)
+    const addMatBtn = document.getElementById('add-material-btn');
+    if (addMatBtn) {
+        addMatBtn.addEventListener('click', () => {
+            addModalMode = 'dev';
+            if (filamentModal) filamentModal.classList.remove('hidden');
+        });
+    }
+    
+    const saAddMatBtn = document.getElementById('sa-add-material-btn');
+    if (saAddMatBtn) {
+        saAddMatBtn.addEventListener('click', () => {
+            addModalMode = 'sa';
+            if (filamentModal) filamentModal.classList.remove('hidden');
+        });
+    }
+
+    // Open Machine Modal (Dev & SA)
+    const addMachBtn = document.getElementById('add-machine-btn');
+    if (addMachBtn) {
+        addMachBtn.addEventListener('click', () => {
+            addModalMode = 'dev';
+            if (machineModal) machineModal.classList.remove('hidden');
+        });
+    }
+    
+    const saAddMachBtn = document.getElementById('sa-add-machine-btn');
+    if (saAddMachBtn) {
+        saAddMachBtn.addEventListener('click', () => {
+            addModalMode = 'sa';
+            if (machineModal) machineModal.classList.remove('hidden');
+        });
+    }
+
+    // Form Submission: Add Filament
+    if (filamentForm) {
+        filamentForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const nameInput = document.getElementById('new-filament-name');
+            if (!nameInput) return;
+            const name = nameInput.value.trim().toUpperCase();
+            if (!name) return;
+            
+            const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+            
+            if (addModalMode === 'dev') {
+                if (materials.some(m => m.id === id)) {
+                    showToast(`Filament '${name}' already exists.`, 'error');
+                    return;
+                }
+                materials.push({
+                    id: id,
+                    name: name,
+                    density_g_cm3: 1.24,
+                    price_per_kg: 60.0
+                });
+                populateSettingsFields({
+                    global_settings: getLocalGlobalSettings(),
+                    materials: materials,
+                    machines: machines
+                });
+            } else {
+                if (saMaterials.some(m => m.id === id)) {
+                    showToast(`Filament '${name}' already exists.`, 'error');
+                    return;
+                }
+                saMaterials.push({
+                    id: id,
+                    name: name,
+                    density_g_cm3: 1.24,
+                    price_per_kg: 60.0
+                });
+                renderSaMaterialsAndMachines(saMaterials, saMachines);
+            }
+            
+            closeFilament();
+            showToast(`Filament '${name}' added. Click Save to persist changes.`, 'warning');
+        });
+    }
+
+    // Form Submission: Add Machine
+    if (machineForm) {
+        machineForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const nameInput = document.getElementById('new-machine-name');
+            const providerInput = document.getElementById('new-machine-provider');
+            const enclosedInput = document.getElementById('new-machine-enclosed');
+            if (!nameInput || !providerInput) return;
+            
+            const name = nameInput.value.trim();
+            const provider = providerInput.value.trim();
+            if (!name || !provider) return;
+            
+            const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+            const isEnclosed = enclosedInput ? enclosedInput.checked : false;
+            
+            if (addModalMode === 'dev') {
+                if (machines.some(m => m.id === id)) {
+                    showToast(`Machine '${name}' already exists.`, 'error');
+                    return;
+                }
+                machines.push({
+                    id: id,
+                    name: name,
+                    provider: provider,
+                    power_watts: 200.0,
+                    flat_premium: 0.0,
+                    enclosed: isEnclosed
+                });
+                populateSettingsFields({
+                    global_settings: getLocalGlobalSettings(),
+                    materials: materials,
+                    machines: machines
+                });
+            } else {
+                if (saMachines.some(m => m.id === id)) {
+                    showToast(`Machine '${name}' already exists.`, 'error');
+                    return;
+                }
+                saMachines.push({
+                    id: id,
+                    name: name,
+                    provider: provider,
+                    power_watts: 200.0,
+                    flat_premium: 0.0,
+                    enclosed: isEnclosed
+                });
+                renderSaMaterialsAndMachines(saMaterials, saMachines);
+            }
+            
+            closeMachine();
+            showToast(`Machine '${name}' added. Click Save to persist changes.`, 'warning');
+        });
+    }
+}
+
+function renderSaMaterialsAndMachines(mats, machs) {
+    const matTbody = document.getElementById('sa-materials-tbody');
+    if (matTbody) {
+        matTbody.innerHTML = '';
+        mats.forEach(mat => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td style="font-weight: 700;">${escapeHtml(mat.name)}</td>
+                <td><input type="number" step="0.01" class="tbl-input sa-mat-density" data-id="${mat.id}" value="${mat.density_g_cm3}"></td>
+                <td><input type="number" step="1" class="tbl-input sa-mat-price" data-id="${mat.id}" value="${mat.price_per_kg}"></td>
+                <td style="text-align: center;">
+                    <button type="button" class="tbl-btn btn-danger sa-delete-material-btn" data-id="${mat.id}" title="Delete Filament" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            matTbody.appendChild(row);
+        });
+        
+        matTbody.querySelectorAll('.sa-delete-material-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-id');
+                deleteSaLocalMaterial(id);
+            });
+        });
+    }
+    
+    const machTbody = document.getElementById('sa-machines-tbody');
+    if (machTbody) {
+        machTbody.innerHTML = '';
+        machs.forEach(mach => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td style="font-weight: 700;">${escapeHtml(mach.name)}</td>
+                <td><input type="text" class="tbl-input sa-mach-provider" data-id="${mach.id}" value="${escapeHtml(mach.provider || '')}" placeholder="e.g. Bambulab"></td>
+                <td><input type="number" step="10" class="tbl-input sa-mach-power" data-id="${mach.id}" value="${mach.power_watts}"></td>
+                <td><input type="number" step="1" class="tbl-input sa-mach-premium" data-id="${mach.id}" value="${mach.flat_premium}"></td>
+                <td style="text-align: center;">
+                    <input type="checkbox" class="sa-mach-enclosed" data-id="${mach.id}" ${mach.enclosed ? 'checked' : ''} style="cursor: pointer; width: auto; transform: scale(1.1);">
+                </td>
+                <td style="text-align: center;">
+                    <button type="button" class="tbl-btn btn-danger sa-delete-machine-btn" data-id="${mach.id}" title="Delete Machine" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            machTbody.appendChild(row);
+        });
+        
+        machTbody.querySelectorAll('.sa-delete-machine-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-id');
+                deleteSaLocalMachine(id);
+            });
+        });
+    }
+}
+
+function deleteSaLocalMaterial(id) {
+    if (saMaterials.length <= 1) {
+        showToast('You must keep at least one filament.', 'error');
+        return;
+    }
+    const mat = saMaterials.find(m => m.id === id);
+    if (!mat) return;
+    if (confirm(`Are you sure you want to delete filament '${mat.name}' globally?`)) {
+        saMaterials = saMaterials.filter(m => m.id !== id);
+        renderSaMaterialsAndMachines(saMaterials, saMachines);
+    }
+}
+
+function deleteSaLocalMachine(id) {
+    if (saMachines.length <= 1) {
+        showToast('You must keep at least one machine.', 'error');
+        return;
+    }
+    const mach = saMachines.find(m => m.id === id);
+    if (!mach) return;
+    if (confirm(`Are you sure you want to delete machine '${mach.name}' globally?`)) {
+        saMachines = saMachines.filter(m => m.id !== id);
+        renderSaMaterialsAndMachines(saMaterials, saMachines);
+    }
 }
 

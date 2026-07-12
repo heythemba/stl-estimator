@@ -5,3 +5,4 @@ numpy
 sqlalchemy
 python-multipart
 requests
+scipy

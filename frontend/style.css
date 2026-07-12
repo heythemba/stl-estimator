@@ -118,10 +118,9 @@ body {
 }
 
 .logo-icon {
-    font-size: 2.2rem;
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    width: 2.2rem;
+    height: 2.2rem;
+    object-fit: contain;
     filter: drop-shadow(0 0 10px var(--primary-glow));
 }
 
@@ -1386,4 +1385,58 @@ body {
 .auth-tab-btn.active {
     border-bottom-color: var(--primary);
     color: var(--text-main);
+}
+
+/* Rate Limit Overlay */
+.rate-limited {
+    pointer-events: none;
+    position: relative;
+}
+
+.rate-limit-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(11, 15, 25, 0.95);
+    backdrop-filter: blur(4px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    z-index: 10;
+    animation: fadeIn 0.3s ease;
+    border: 2px solid rgba(239, 68, 68, 0.3);
+}
+
+.rate-limit-overlay.hidden {
+    display: none !important;
+}
+
+.rate-limit-overlay i {
+    font-size: 2.2rem;
+    color: var(--error);
+    margin-bottom: 0.6rem;
+    animation: saPulse 2s infinite ease-in-out;
+}
+
+.rate-limit-overlay h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.rate-limit-overlay p {
+    margin: 0.3rem 0 0 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+@keyframes saPulse {
+    0% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.1); opacity: 1; filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.6)); }
+    100% { transform: scale(1); opacity: 0.8; }
 }

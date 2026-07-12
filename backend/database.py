@@ -69,6 +69,8 @@ class Machine(Base):
     name = Column(String, nullable=False)            # e.g., 'A1 Combo'
     power_watts = Column(Float, nullable=False)      # e.g., 150.0
     flat_premium = Column(Float, nullable=False)     # e.g., 0.0 (TND)
+    provider = Column(String, nullable=True)         # e.g., 'Bambulab'
+    enclosed = Column(Boolean, default=False, nullable=False)
 
 class GlobalSetting(Base):
     __tablename__ = "global_settings"
@@ -107,6 +109,8 @@ class UserMachine(Base):
     name = Column(String, nullable=False)
     power_watts = Column(Float, nullable=False)
     flat_premium = Column(Float, nullable=False)
+    provider = Column(String, nullable=True)         # e.g., 'Bambulab'
+    enclosed = Column(Boolean, default=False, nullable=False)
 
 # Dependency to get db session
 def get_db():
@@ -133,6 +137,43 @@ def seed_database():
                 print("Migration: adding 'user_id' column to 'api_keys' table.")
                 db.execute(text("ALTER TABLE api_keys ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL"))
                 db.commit()
+
+        if "machines" in inspector.get_table_names():
+            columns = [c["name"] for c in inspector.get_columns("machines")]
+            if "provider" not in columns:
+                print("Migration: adding 'provider' column to 'machines' table.")
+                db.execute(text("ALTER TABLE machines ADD COLUMN provider VARCHAR"))
+                db.commit()
+            if "enclosed" not in columns:
+                print("Migration: adding 'enclosed' column to 'machines' table.")
+                try:
+                    db.execute(text("ALTER TABLE machines ADD COLUMN enclosed BOOLEAN DEFAULT FALSE"))
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                    db.execute(text("ALTER TABLE machines ADD COLUMN enclosed BOOLEAN DEFAULT 0"))
+                    db.commit()
+                try:
+                    db.execute(text("UPDATE machines SET enclosed = 1 WHERE id = 'h2s'"))
+                    db.commit()
+                except Exception:
+                    db.rollback()
+
+        if "user_machines" in inspector.get_table_names():
+            columns = [c["name"] for c in inspector.get_columns("user_machines")]
+            if "provider" not in columns:
+                print("Migration: adding 'provider' column to 'user_machines' table.")
+                db.execute(text("ALTER TABLE user_machines ADD COLUMN provider VARCHAR"))
+                db.commit()
+            if "enclosed" not in columns:
+                print("Migration: adding 'enclosed' column to 'user_machines' table.")
+                try:
+                    db.execute(text("ALTER TABLE user_machines ADD COLUMN enclosed BOOLEAN DEFAULT FALSE"))
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                    db.execute(text("ALTER TABLE user_machines ADD COLUMN enclosed BOOLEAN DEFAULT 0"))
+                    db.commit()
     except Exception as migration_error:
         print(f"Migration warning: {migration_error}")
         db.rollback()
@@ -153,8 +194,8 @@ def seed_database():
         # 2. Seed Machines
         if db.query(Machine).count() == 0:
             machines = [
-                Machine(id="a1_combo", name="A1 Combo", power_watts=150.0, flat_premium=0.0),
-                Machine(id="h2s", name="H2S", power_watts=350.0, flat_premium=15.0),
+                Machine(id="a1_combo", name="A1 Combo", power_watts=150.0, flat_premium=0.0, provider="Bambulab", enclosed=False),
+                Machine(id="h2s", name="H2S", power_watts=350.0, flat_premium=15.0, provider="Custom", enclosed=True),
             ]
             db.bulk_save_objects(machines)
             db.commit()

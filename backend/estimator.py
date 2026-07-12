@@ -1,6 +1,7 @@
 import io
 import trimesh
 import numpy as np
+import scipy
 from sqlalchemy.orm import Session
 from backend.database import Material, Machine, GlobalSetting, TimeBracket, UserSetting, UserMaterial, UserMachine
 
@@ -88,20 +89,29 @@ def calculate_public_estimate(db: Session, volume_cm3: float, material_id: str, 
     est_weight = base_weight * (1.0 + support_buffer)
     
     # 4. Auto-select Machine
-    if material_id.lower() in ["pla", "petg"]:
-        machine_id = "a1_combo"
-    else:
-        machine_id = "h2s"
-        
+    needs_enclosed = material_id.lower() not in ["pla", "petg"]
+    
+    machine = None
     if user_id:
-        machine = db.query(UserMachine).filter(UserMachine.user_id == user_id, UserMachine.machine_id == machine_id).first()
-    else:
-        machine = None
+        # Try to find a user machine matching the enclosed requirement
+        machine = db.query(UserMachine).filter(
+            UserMachine.user_id == user_id,
+            UserMachine.enclosed == needs_enclosed
+        ).first()
+        if not machine:
+            machine = db.query(UserMachine).filter(UserMachine.user_id == user_id).first()
+            
+    if not machine:
+        # Try to find a global machine matching the enclosed requirement
+        machine = db.query(Machine).filter(Machine.enclosed == needs_enclosed).first()
         
     if not machine:
-        machine = db.query(Machine).filter(Machine.id == machine_id).first()
+        machine = db.query(Machine).first()
+        
     if not machine:
-        machine = Machine(id=machine_id, name="Default Machine", power_watts=200.0, flat_premium=0.0)
+        machine = Machine(id="a1_combo", name="Default Machine", power_watts=200.0, flat_premium=0.0, enclosed=False)
+        
+    machine_id = machine.machine_id if hasattr(machine, 'machine_id') else machine.id
 
     # 5. Estimate Print Time via Bracket Lookup
     bracket = (
