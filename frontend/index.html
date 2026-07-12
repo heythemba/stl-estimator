@@ -200,14 +200,13 @@
                                 <input type="password" id="login-password" class="form-input" required
                                     placeholder="••••••••">
                             </div>
-                            <div
-                                style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
-                                <button type="submit" class="submit-btn">
-                                    <i class="fa-solid fa-right-to-bracket"></i> Login
-                                </button>
+                            <button type="submit" class="submit-btn" style="margin-top: 1rem; width: 100%;">
+                                <i class="fa-solid fa-right-to-bracket"></i> Login
+                            </button>
+                            <div style="text-align: center; margin-top: 0.8rem;">
                                 <a href="#" id="forgot-password-link"
-                                    style="color: var(--primary-light); font-size: 0.85rem; text-decoration: none;">Forgot
-                                    Password?</a>
+                                    onclick="event.preventDefault(); document.getElementById('forgot-password-modal').classList.remove('hidden'); document.getElementById('forgot-email').focus();"
+                                    style="color: var(--primary-light); font-size: 0.85rem; text-decoration: none; display: inline-block; padding: 0.2rem 0; cursor: pointer;">Forgot Password?</a>
                             </div>
                         </form>
 
@@ -965,6 +964,29 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <!-- App Script -->
     <script src="app.js"></script>
+
+    <!-- Forgot Password Modal -->
+    <div id="forgot-password-modal" class="modal-overlay hidden" onclick="if(event.target===this) { this.classList.add('hidden'); document.getElementById('developer-forgot-form').reset(); }">
+        <div class="modal-card glass-card" style="max-width: 440px; width: 100%; padding: 2.2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
+                <h3 style="font-size: 1.2rem; font-weight: 700; margin: 0;"><i class="fa-solid fa-key"></i> Reset Your Password</h3>
+                <button type="button" onclick="document.getElementById('forgot-password-modal').classList.add('hidden'); document.getElementById('developer-forgot-form').reset();" class="tbl-btn" style="padding: 0.4rem 0.7rem; font-size: 1rem; line-height: 1;">&times;</button>
+            </div>
+            <p class="card-subtitle" style="margin-bottom: 1.2rem; font-size: 0.875rem;">Enter your registered email address. We'll send you a link to reset your password.</p>
+            <form id="developer-forgot-form" onsubmit="handleForgotPassword(event)">
+                <div class="form-group">
+                    <label class="form-label" for="forgot-email">Email Address</label>
+                    <input type="email" id="forgot-email" class="form-input" required placeholder="e.g. jane@example.com">
+                </div>
+                <div style="display: flex; gap: 0.8rem; margin-top: 1.2rem;">
+                    <button type="submit" class="submit-btn" style="flex: 1;">
+                        <i class="fa-solid fa-envelope"></i> Send Reset Link
+                    </button>
+                    <button type="button" onclick="document.getElementById('forgot-password-modal').classList.add('hidden'); document.getElementById('developer-forgot-form').reset();" class="tbl-btn" style="padding: 0.8rem 1.2rem;">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </body>
 
 </html>
