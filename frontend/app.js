@@ -5,30 +5,6 @@ let globalSettings = {};
 let selectedPublicMaterialId = 'pla';
 let activeStlFile = null;
 
-// Global: Forgot Password handler (called from modal onsubmit)
-async function handleForgotPassword(event) {
-    event.preventDefault();
-    const email = document.getElementById('forgot-email').value.trim();
-    if (!email) return;
-    try {
-        const response = await fetch('/api/auth/forgot-password', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email })
-        });
-        const data = await response.json();
-        if (response.ok) {
-            showToast(data.message || 'If registered, a reset link has been sent to your email.', 'success');
-            document.getElementById('forgot-password-modal').classList.add('hidden');
-            document.getElementById('developer-forgot-form').reset();
-        } else {
-            showToast(data.detail || 'Failed to send reset link.', 'error');
-        }
-    } catch (err) {
-        showToast('Network error. Please try again.', 'error');
-    }
-}
-
 // Three.js Variables
 let scene, camera, renderer, controls, stlMesh;
 let animationFrameId;
