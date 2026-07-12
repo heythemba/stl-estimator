@@ -178,7 +178,6 @@ function setupPublicEstimator() {
     const fileInput = document.getElementById('stl-file-input');
     const removeFileBtn = document.getElementById('remove-file-btn');
     const calcBtn = document.getElementById('public-calculate-btn');
-    const confirmMatSelect = document.getElementById('confirm-material-select');
     
     // Drag and drop events
     uploadZone.addEventListener('click', () => fileInput.click());
@@ -206,31 +205,15 @@ function setupPublicEstimator() {
         }
     });
     
-    removeFileBtn.addEventListener('click', () => {
-        resetPublicEstimator();
-    });
+    if (removeFileBtn) {
+        removeFileBtn.addEventListener('click', () => resetPublicEstimator());
+    }
     
+    // Calculate button (now on left panel — shown after successful scan)
     if (calcBtn) {
         calcBtn.addEventListener('click', () => {
             if (!activeStlFile) return;
-            document.getElementById('public-upload-confirm').classList.add('hidden');
             triggerEstimation(activeStlFile);
-        });
-    }
-    
-    if (confirmMatSelect) {
-        confirmMatSelect.addEventListener('change', () => {
-            selectedPublicMaterialId = confirmMatSelect.value;
-            updateMeshMaterialColor(selectedPublicMaterialId);
-            
-            // Sync with materials grid
-            document.querySelectorAll('.material-card').forEach(card => {
-                if (card.getAttribute('data-id') === selectedPublicMaterialId) {
-                    card.classList.add('active');
-                } else {
-                    card.classList.remove('active');
-                }
-            });
         });
     }
 }
@@ -289,26 +272,26 @@ function triggerStlScan(file) {
         } catch (e) {}
         
         if (xhr.status === 200) {
+            // Keep progress bar in a "Ready" state — don't hide it
             progressBar.style.width = '100%';
-            statusText.innerText = 'Scan Complete!';
+            progressBar.style.background = 'linear-gradient(90deg, var(--success), #34d399)';
+            statusText.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--success)"></i> Ready — click Calculate on the left';
             
-            // Hide progress container after a short delay
-            setTimeout(() => {
-                document.getElementById('upload-progress-container').classList.add('hidden');
-            }, 1000);
-            
-            // Show confirmation screen
+            // Hide dropzone, keep progress bar visible
             document.getElementById('upload-zone').classList.add('hidden');
+            
+            // Show read-only scan stats on the right
             const confirmPanel = document.getElementById('public-upload-confirm');
             confirmPanel.classList.remove('hidden');
-            
             document.getElementById('confirm-filename').innerText = file.name;
             document.getElementById('confirm-volume').innerText = res.volume_cm3 + ' cm³';
             document.getElementById('confirm-watertight').innerHTML = res.is_watertight ? 
                 '<span style="color: var(--success);"><i class="fa-solid fa-circle-check"></i> Yes</span>' : 
                 '<span style="color: var(--warning);"><i class="fa-solid fa-triangle-exclamation"></i> No</span>';
             
-            populateConfirmMaterialSelect();
+            // Show Calculate button on the left
+            const calcBtn = document.getElementById('public-calculate-btn');
+            if (calcBtn) calcBtn.classList.remove('hidden');
             
         } else {
             progressBar.style.backgroundColor = 'var(--error)';
@@ -326,31 +309,18 @@ function triggerStlScan(file) {
     xhr.send(formData);
 }
 
-function populateConfirmMaterialSelect() {
-    const select = document.getElementById('confirm-material-select');
-    if (!select) return;
-    select.innerHTML = '';
-    materials.forEach(mat => {
-        const option = document.createElement('option');
-        option.value = mat.id;
-        option.text = `${mat.name} (${mat.price_per_kg} TND/kg)`;
-        if (mat.id === selectedPublicMaterialId) {
-            option.selected = true;
-        }
-        select.appendChild(option);
-    });
-}
-
 function triggerEstimation(file) {
-    // Show progress card again
-    const progressContainer = document.getElementById('upload-progress-container');
-    const progressBar = document.getElementById('upload-progress-bar');
-    const statusText = document.getElementById('upload-status-text');
+    // Hide the Calculate button to prevent double-click
+    const calcBtn = document.getElementById('public-calculate-btn');
+    if (calcBtn) calcBtn.classList.add('hidden');
     
-    progressContainer.classList.remove('hidden');
-    progressBar.style.width = '40%';
-    statusText.innerText = 'Calculating cost estimation...';
+    // Hide stats panel, show spinner on the right
+    document.getElementById('public-upload-confirm').classList.add('hidden');
+    document.getElementById('public-result-card').classList.add('hidden');
+    const calcLoading = document.getElementById('calc-loading');
+    if (calcLoading) { calcLoading.classList.remove('hidden'); calcLoading.style.display = 'flex'; }
     
+    // Re-send file silently (Option B — no second progress bar shown)
     const formData = new FormData();
     formData.append('file', file);
     formData.append('material_id', selectedPublicMaterialId);
@@ -364,32 +334,30 @@ function triggerEstimation(file) {
     }
     
     xhr.onload = function () {
+        // Hide spinner
+        if (calcLoading) { calcLoading.classList.add('hidden'); calcLoading.style.display = 'none'; }
+        
         let detail = 'Failed to estimate';
-        try {
-            detail = JSON.parse(xhr.responseText).detail || detail;
-        } catch (e) {}
+        try { detail = JSON.parse(xhr.responseText).detail || detail; } catch (e) {}
         
         if (xhr.status === 200) {
-            progressBar.style.width = '100%';
-            statusText.innerText = 'Done!';
-            
-            setTimeout(() => {
-                progressContainer.classList.add('hidden');
-            }, 1000);
-            
             const result = JSON.parse(xhr.responseText);
             displayPublicResults(result);
+            // Show Calculate button again for recalculate
+            if (calcBtn) calcBtn.classList.remove('hidden');
         } else {
-            progressBar.style.backgroundColor = 'var(--error)';
-            statusText.innerText = 'Error: ' + detail;
             showToast(detail, 'error');
+            // Restore UI so user can retry
+            if (calcBtn) calcBtn.classList.remove('hidden');
+            document.getElementById('public-upload-confirm').classList.remove('hidden');
         }
     };
     
     xhr.onerror = function () {
-        progressBar.style.backgroundColor = 'var(--error)';
-        statusText.innerText = 'Connection error.';
-        showToast('Connection error during upload.', 'error');
+        if (calcLoading) { calcLoading.classList.add('hidden'); calcLoading.style.display = 'none'; }
+        showToast('Connection error during estimation.', 'error');
+        if (calcBtn) calcBtn.classList.remove('hidden');
+        document.getElementById('public-upload-confirm').classList.remove('hidden');
     };
     
     xhr.send(formData);
@@ -414,9 +382,23 @@ function displayPublicResults(res) {
 function resetPublicEstimator() {
     activeStlFile = null;
     document.getElementById('stl-file-input').value = '';
+    
+    // Reset progress bar style
+    const progressBar = document.getElementById('upload-progress-bar');
+    if (progressBar) { progressBar.style.width = '0%'; progressBar.style.background = ''; progressBar.style.backgroundColor = ''; }
     document.getElementById('upload-progress-container').classList.add('hidden');
+    document.getElementById('upload-status-text').innerText = 'Scanning volume mesh...';
+    
     document.getElementById('public-result-card').classList.add('hidden');
     document.getElementById('public-upload-confirm').classList.add('hidden');
+    
+    // Hide calc loading and calculate button
+    const calcLoading = document.getElementById('calc-loading');
+    if (calcLoading) { calcLoading.classList.add('hidden'); calcLoading.style.display = 'none'; }
+    const calcBtn = document.getElementById('public-calculate-btn');
+    if (calcBtn) calcBtn.classList.add('hidden');
+    
+    // Restore dropzone
     document.getElementById('upload-zone').classList.remove('hidden');
     
     // Clear 3D model
