@@ -7,6 +7,8 @@ from sqlalchemy.orm import sessionmaker
 # Database Configuration
 # Default to local SQLite, but can be overridden by DATABASE_URL (e.g. Supabase/PostgreSQL)
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///replica_estimator_v4.db")
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # For SQLite, we need to allow multithreading, but PostgreSQL doesn't need it.
 connect_args = {}
