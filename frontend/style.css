@@ -96,8 +96,6 @@ body {
     position: relative;
     z-index: 10;
     display: flex;
-    flex-column: column;
-    display: flex;
     flex-direction: column;
 }
 
@@ -131,6 +129,7 @@ body {
     line-height: 1.1;
     background: linear-gradient(135deg, #ffffff, #a5b4fc);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
@@ -641,6 +640,7 @@ body {
     color: #ffffff;
     background: linear-gradient(90deg, #ffffff, #67e8f9);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
     margin-top: 0.2rem;
 }
