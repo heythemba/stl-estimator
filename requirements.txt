@@ -6,5 +6,3 @@ sqlalchemy
 python-multipart
 requests
 scipy
-psycopg2-binary
-
