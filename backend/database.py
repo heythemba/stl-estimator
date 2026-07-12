@@ -3,6 +3,12 @@ from datetime import datetime
 from sqlalchemy import create_engine, Column, String, Float, Integer, Boolean, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Load environment variables
+env_path = Path(__file__).resolve().parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
 
 # Database Configuration
 # Default to local SQLite, but can be overridden by DATABASE_URL (e.g. Supabase/PostgreSQL)

@@ -1,4 +1,11 @@
 import os
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Load environment variables
+env_path = Path(__file__).resolve().parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
+
 import time
 import secrets
 import shutil
@@ -501,7 +508,7 @@ def update_settings(
             detail=f"Failed to update settings: {str(e)}"
         )
 # Resend API configuration
-RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "re_PBbRoq9j_4JZLgZQ1RmtYUNRZT5S5GmGA")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
 
 def send_resend_email(to_email: str, subject: str, html_content: str) -> bool:
     """
