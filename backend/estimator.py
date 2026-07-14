@@ -1,3 +1,12 @@
+"""
+Estimator Module
+
+This module is responsible for the core mathematical operations of the 3D Printing Cost Estimator.
+It handles:
+1. STL file parsing and volume extraction (using trimesh).
+2. Public widget cost estimation (calculating price ranges based on volume).
+3. Admin precise cost calculation (factoring in electricity, labor, wear & tear).
+"""
 import io
 import trimesh
 import numpy as np
@@ -8,9 +17,15 @@ from backend.database import Material, Machine, GlobalSetting, TimeBracket, User
 def parse_stl_volume(file_bytes: bytes):
     """
     Parses STL file bytes to calculate mesh volume and surface area.
-    Converts from mm^3 to cm^3 (assuming STL is in mm).
+    
+    Args:
+        file_bytes (bytes): The raw binary content of an uploaded STL file.
+        
+    Returns:
+        dict: Contains calculated volume_cm3, surface_area_cm2, is_watertight status, and any error message.
     """
     try:
+        # Load the STL data into memory so trimesh can parse it without a physical file
         file_obj = io.BytesIO(file_bytes)
         mesh = trimesh.load(file_obj, file_type='stl')
         
@@ -45,17 +60,31 @@ def parse_stl_volume(file_bytes: bytes):
         }
 
 def get_setting(db: Session, key: str, default: float) -> float:
+    """Helper function to fetch a global setting from the DB, returning a default if not found."""
     setting = db.query(GlobalSetting).filter(GlobalSetting.key == key).first()
     return setting.value if setting else default
 
 def get_user_setting(db: Session, user_id: int, key: str, default: float) -> float:
+    """Helper function to fetch a user-specific setting from the DB, returning a default if not found."""
     setting = db.query(UserSetting).filter(UserSetting.user_id == user_id, UserSetting.key == key).first()
     return setting.value if setting else default
 
 def calculate_public_estimate(db: Session, volume_cm3: float, material_id: str, user_id: int = None):
     """
     Calculates the public estimate range, print time, and machine selection based on mesh volume.
+    
+    This function auto-selects a machine based on whether the material requires an enclosure (e.g. ABS).
+    It then estimates print time using configured "Time Brackets" and calculates a min-max price range.
     Supports user overrides if user_id is provided.
+    
+    Args:
+        db (Session): Database session.
+        volume_cm3 (float): The calculated volume of the part in cubic centimeters.
+        material_id (str): The ID of the requested material (e.g. "pla", "petg").
+        user_id (int, optional): The ID of a developer user, if requested via developer API key.
+        
+    Returns:
+        dict: A dictionary containing weight, time, machine name, price_min, price_max, and material_cost.
     """
     # 1. Fetch material info
     if user_id:
@@ -163,7 +192,22 @@ def calculate_admin_cost(
 ):
     """
     Calculates precise internal cost breakdown and final selling price for the Dashboard.
+    
+    Unlike public estimate, this function uses exact metrics provided by a slicer (weight and time)
+    to calculate precise direct costs (electricity, material) and indirect costs (labor, wear and tear).
     Supports user overrides if user_id is provided.
+    
+    Args:
+        db (Session): Database session.
+        weight_g (float): The exact print weight in grams.
+        print_time_mins (float): The exact print time in minutes.
+        material_id (str): The specific material used.
+        machine_id (str): The specific machine used.
+        labor_hours (float, optional): Labor hours spent setting up/post-processing. Defaults to 0.0.
+        user_id (int, optional): The ID of a developer user.
+        
+    Returns:
+        dict: A highly detailed breakdown including material_cost, electricity_cost, direct_cost, wear_tear, labor_cost, subtotal, and final selling_price.
     """
     # 1. Fetch material info
     if user_id:
@@ -202,13 +246,19 @@ def calculate_admin_cost(
     # 4. Perform calculations
     material_cost = (weight_g / 1000.0) * material.price_per_kg
     
+    # Calculate electricity cost based on print time and machine power consumption
     print_time_hours = print_time_mins / 60.0
     machine_power_kw = machine.power_watts / 1000.0
     electricity_cost = machine_power_kw * print_time_hours * electricity_rate
     
+    # Base manufacturing cost
     direct_cost = material_cost + electricity_cost
+    
+    # Overhead costs
     wear_tear = direct_cost * wear_tear_percent
     labor_cost = labor_hours * labor_rate_hourly
+    
+    # Final Pricing calculations
     subtotal = direct_cost + wear_tear + labor_cost
     selling_price = subtotal * (1.0 + margin_percent) + machine.flat_premium
 

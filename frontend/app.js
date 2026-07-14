@@ -454,9 +454,12 @@ function setupAdminCalculator() {
             print_time_mins: parseFloat(document.getElementById('admin-time').value),
             labor_hours: parseFloat(document.getElementById('admin-labor').value || 0)
         };
-        
-        // Use developer active API key if logged in, fallback to default key
-        const activeKey = localStorage.getItem('replica_active_dev_key') || 'replica_default_key';
+        // Use developer active API key if logged in
+        const activeKey = localStorage.getItem('replica_active_dev_key');
+        if (!activeKey) {
+            showToast('API Key required for the precise calculator', 'error');
+            return;
+        }
         
         try {
             const response = await fetch('/api/estimate/admin', {

@@ -1,3 +1,10 @@
+"""
+Bootstrapper Script
+
+This script initializes the environment for the Replica Cost Estimator.
+It automatically creates a Python virtual environment (if missing),
+installs required dependencies from requirements.txt, and starts the FastAPI backend server using Uvicorn.
+"""
 import os
 import sys
 import subprocess

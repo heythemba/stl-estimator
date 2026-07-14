@@ -1,3 +1,9 @@
+"""
+Database Module
+
+This module handles the database connection, SQLAlchemy ORM model definitions,
+and initial data seeding. It defaults to SQLite but can be overridden with a Postgres URL.
+"""
 import os
 from datetime import datetime
 from sqlalchemy import create_engine, Column, String, Float, Integer, Boolean, DateTime, ForeignKey
@@ -26,6 +32,9 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 class User(Base):
+    """
+    Represents a developer or admin user registered in the system.
+    """
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     username = Column(String, unique=True, index=True, nullable=False)
@@ -38,6 +47,9 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 class UserSession(Base):
+    """
+    Tracks active login sessions for developer/admin users.
+    """
     __tablename__ = "user_sessions"
     token = Column(String, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -63,8 +75,12 @@ class StlUpload(Base):
     api_key_used = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-# Models
+# Core Pricing Models
 class Material(Base):
+    """
+    Represents a global 3D printing material (e.g., PLA, PETG) available to all users.
+    Used for volume-to-weight and base cost calculations.
+    """
     __tablename__ = "materials"
     id = Column(String, primary_key=True, index=True) # e.g., 'pla'
     name = Column(String, nullable=False)            # e.g., 'PLA'
@@ -72,6 +88,10 @@ class Material(Base):
     price_per_kg = Column(Float, nullable=False)     # e.g., 60.0 (TND)
 
 class Machine(Base):
+    """
+    Represents a global 3D printer available in the system.
+    Includes power consumption and enclosure requirements to auto-select the right machine.
+    """
     __tablename__ = "machines"
     id = Column(String, primary_key=True, index=True) # e.g., 'a1_combo'
     name = Column(String, nullable=False)            # e.g., 'A1 Combo'
@@ -130,6 +150,10 @@ def get_db():
 
 # Seeding Logic
 def seed_database():
+    """
+    Initializes the database by creating tables and injecting default
+    materials, machines, and configuration settings if the database is empty.
+    """
     Base.metadata.create_all(bind=engine)
     
     # Run migrations for SQLite/existing databases if needed (e.g. adding missing columns)

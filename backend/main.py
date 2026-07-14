@@ -1,3 +1,14 @@
+"""
+Main FastAPI Application Module
+
+This is the entry point for the Replica Cost Estimator backend API.
+It configures the FastAPI application, sets up middleware (CORS, error logging),
+and defines all HTTP endpoints including:
+- Public estimation and STL scanning
+- Admin precise cost calculation
+- Settings management
+- Developer authentication and API Key generation
+"""
 import os
 from dotenv import load_dotenv
 from pathlib import Path
@@ -372,7 +383,7 @@ def admin_estimate(
         user_id = api_key.user_id
         
     if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required to run precise calculator.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API Key required for the precise calculator")
         
     try:
         breakdown = calculate_admin_cost(
