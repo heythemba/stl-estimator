@@ -69,7 +69,7 @@ def get_user_setting(db: Session, user_id: int, key: str, default: float) -> flo
     setting = db.query(UserSetting).filter(UserSetting.user_id == user_id, UserSetting.key == key).first()
     return setting.value if setting else default
 
-def calculate_public_estimate(db: Session, volume_cm3: float, material_id: str, user_id: int = None):
+def calculate_public_estimate(db: Session, volume_cm3: float, material_id: str, infill: float = 20.0, user_id: int = None):
     """
     Calculates the public estimate range, print time, and machine selection based on mesh volume.
     
@@ -81,6 +81,7 @@ def calculate_public_estimate(db: Session, volume_cm3: float, material_id: str, 
         db (Session): Database session.
         volume_cm3 (float): The calculated volume of the part in cubic centimeters.
         material_id (str): The ID of the requested material (e.g. "pla", "petg").
+        infill (float): The selected infill percentage (20.0 to 80.0).
         user_id (int, optional): The ID of a developer user, if requested via developer API key.
         
     Returns:
@@ -99,20 +100,26 @@ def calculate_public_estimate(db: Session, volume_cm3: float, material_id: str, 
 
     # 2. Fetch settings
     if user_id:
-        infill_ratio = get_user_setting(db, user_id, "infill_ratio", 20.0) / 100.0
-        support_buffer = get_user_setting(db, user_id, "support_buffer_percent", 10.0) / 100.0
+        electricity_rate = get_user_setting(db, user_id, "electricity_rate", 0.0)
+        wear_tear_percent = get_user_setting(db, user_id, "wear_tear_percent", 10.0) / 100.0
         margin_percent = get_user_setting(db, user_id, "margin_percent", 20.0) / 100.0
+        tax_percent = get_user_setting(db, user_id, "tax_percent", 19.0) / 100.0
+        support_buffer = get_user_setting(db, user_id, "support_buffer_percent", 10.0) / 100.0
         min_price_cap = 15.0
         min_offset_mult = 0.90
         max_offset_mult = 1.15
     else:
-        infill_ratio = get_setting(db, "public_infill_ratio", 20.0) / 100.0
-        support_buffer = get_setting(db, "public_support_buffer_percent", 10.0) / 100.0
+        electricity_rate = get_setting(db, "electricity_rate", 0.0)
+        wear_tear_percent = get_setting(db, "wear_tear_percent", 10.0) / 100.0
         margin_percent = get_setting(db, "margin_percent", 20.0) / 100.0
+        tax_percent = get_setting(db, "tax_percent", 19.0) / 100.0
+        support_buffer = get_setting(db, "public_support_buffer_percent", 10.0) / 100.0
         min_price_cap = get_setting(db, "public_min_price_cap", 15.0)
         min_offset_mult = get_setting(db, "public_price_range_min_offset", 90.0) / 100.0
         max_offset_mult = get_setting(db, "public_price_range_max_offset", 115.0) / 100.0
     
+    infill_ratio = infill / 100.0
+
     # 3. Calculate weight (g)
     base_weight = volume_cm3 * material.density_g_cm3 * infill_ratio
     est_weight = base_weight * (1.0 + support_buffer)
@@ -162,9 +169,19 @@ def calculate_public_estimate(db: Session, volume_cm3: float, material_id: str, 
     else:
         est_time_mins = 45.0 + (2.0 * est_weight)
 
-    # 6. Calculate Pricing
+    # 6. Calculate Pricing (Precise Public Cost Estimator Formula)
     material_cost = (est_weight / 1000.0) * material.price_per_kg
-    base_price = material_cost * (1.0 + margin_percent) + machine.flat_premium
+    print_time_hours = est_time_mins / 60.0
+    machine_power_kw = machine.power_watts / 1000.0
+    electricity_cost = machine_power_kw * print_time_hours * electricity_rate
+    
+    direct_cost = material_cost + electricity_cost
+    wear_tear = direct_cost * wear_tear_percent
+    subtotal = direct_cost + wear_tear
+    
+    selling_price_ht = subtotal * (1.0 + margin_percent) + machine.flat_premium
+    tax_amount = selling_price_ht * tax_percent
+    base_price = selling_price_ht + tax_amount
     
     if base_price < min_price_cap:
         base_price = min_price_cap
@@ -188,6 +205,8 @@ def calculate_admin_cost(
     material_id: str, 
     machine_id: str,
     labor_hours: float = 0.0,
+    prep_type: str = "none",
+    prep_hours: float = 0.0,
     user_id: int = None
 ):
     """
@@ -204,10 +223,12 @@ def calculate_admin_cost(
         material_id (str): The specific material used.
         machine_id (str): The specific machine used.
         labor_hours (float, optional): Labor hours spent setting up/post-processing. Defaults to 0.0.
+        prep_type (str, optional): Preparation type ('none', 'modeling', 'scanning'). Defaults to 'none'.
+        prep_hours (float, optional): Preparation/modeling hours. Defaults to 0.0.
         user_id (int, optional): The ID of a developer user.
         
     Returns:
-        dict: A highly detailed breakdown including material_cost, electricity_cost, direct_cost, wear_tear, labor_cost, subtotal, and final selling_price.
+        dict: A highly detailed breakdown including material_cost, electricity_cost, direct_cost, wear_tear, labor_cost, prep_cost, subtotal, and final selling_price.
     """
     # 1. Fetch material info
     if user_id:
@@ -237,11 +258,17 @@ def calculate_admin_cost(
         wear_tear_percent = get_user_setting(db, user_id, "wear_tear_percent", 10.0) / 100.0
         margin_percent = get_user_setting(db, user_id, "margin_percent", 20.0) / 100.0
         labor_rate_hourly = get_user_setting(db, user_id, "labor_rate_hourly", 15.0)
+        labor_modeling_rate = get_user_setting(db, user_id, "labor_modeling_rate", 15.0)
+        labor_scanning_rate = get_user_setting(db, user_id, "labor_scanning_rate", 25.0)
+        tax_percent = get_user_setting(db, user_id, "tax_percent", 19.0)
     else:
         electricity_rate = get_setting(db, "electricity_rate", 0.0)
         wear_tear_percent = get_setting(db, "wear_tear_percent", 10.0) / 100.0
         margin_percent = get_setting(db, "margin_percent", 20.0) / 100.0
         labor_rate_hourly = get_setting(db, "labor_rate_hourly", 15.0)
+        labor_modeling_rate = get_setting(db, "labor_modeling_rate", 15.0)
+        labor_scanning_rate = get_setting(db, "labor_scanning_rate", 25.0)
+        tax_percent = get_setting(db, "tax_percent", 19.0)
 
     # 4. Perform calculations
     material_cost = (weight_g / 1000.0) * material.price_per_kg
@@ -258,9 +285,18 @@ def calculate_admin_cost(
     wear_tear = direct_cost * wear_tear_percent
     labor_cost = labor_hours * labor_rate_hourly
     
+    # Prep / design cost
+    prep_cost = 0.0
+    if prep_type.lower() == "modeling":
+        prep_cost = prep_hours * labor_modeling_rate
+    elif prep_type.lower() == "scanning":
+        prep_cost = prep_hours * labor_scanning_rate
+    
     # Final Pricing calculations
-    subtotal = direct_cost + wear_tear + labor_cost
-    selling_price = subtotal * (1.0 + margin_percent) + machine.flat_premium
+    subtotal = direct_cost + wear_tear + labor_cost + prep_cost
+    selling_price_ht = subtotal * (1.0 + margin_percent) + machine.flat_premium
+    tax_amount = selling_price_ht * (tax_percent / 100.0)
+    selling_price_ttc = selling_price_ht + tax_amount
 
     return {
         "material_cost": round(material_cost, 2),
@@ -268,6 +304,10 @@ def calculate_admin_cost(
         "direct_cost": round(direct_cost, 2),
         "wear_tear": round(wear_tear, 2),
         "labor_cost": round(labor_cost, 2),
+        "prep_cost": round(prep_cost, 2),
         "subtotal": round(subtotal, 2),
-        "selling_price": round(selling_price, 2)
+        "margin_val": round(selling_price_ht - subtotal, 2),
+        "selling_price_ht": round(selling_price_ht, 2),
+        "tax_amount": round(tax_amount, 2),
+        "selling_price": round(selling_price_ttc, 2)
     }

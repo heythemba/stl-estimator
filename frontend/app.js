@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupConfirmModalListeners();
     setupBulkDelete();
     setupCustomButtons();
+    setupConfigureEstimatorModal();
 });
 
 // 1. Navigation Setup
@@ -57,6 +58,9 @@ function setupNavigation() {
             } else if (targetTab === 'superadmin-tab') {
                 loadSuperAdminPortal();
             }
+            
+            checkConfigurationState();
+            localStorage.setItem('replica_active_tab', targetTab);
         });
     });
 
@@ -99,6 +103,21 @@ function setupNavigation() {
             if (targetSec) targetSec.classList.add('active');
         });
     });
+
+    // Restore active main tab from localStorage if it exists
+    const lastActiveTab = localStorage.getItem('replica_active_tab');
+    if (lastActiveTab) {
+        const targetBtn = document.querySelector(`.nav-btn[data-tab="${lastActiveTab}"]`);
+        if (targetBtn) {
+            targetBtn.click();
+        }
+    }
+
+    // Remove the flicker prevention style tag if it exists
+    const antiFlickerStyle = document.getElementById('tab-flicker-prevention');
+    if (antiFlickerStyle) {
+        antiFlickerStyle.remove();
+    }
 }
 
 // 2. Fetch Configurations from API
@@ -114,8 +133,10 @@ async function fetchConfig() {
         renderPublicMaterialSelector();
         populateAdminSelects();
         populateSettingsFields(data);
+        checkConfigurationState();
     } catch (error) {
         console.error('Error fetching system configurations:', error);
+        checkConfigurationState();
     }
 }
 
@@ -159,6 +180,18 @@ function setupPublicEstimator() {
     const removeFileBtn = document.getElementById('remove-file-btn');
     const calcBtn = document.getElementById('public-calculate-btn');
     
+    // Infill slider logic
+    const publicInfillSlider = document.getElementById('public-infill-slider');
+    const publicInfillVal = document.getElementById('public-infill-val');
+    if (publicInfillSlider && publicInfillVal) {
+        publicInfillSlider.addEventListener('input', (e) => {
+            publicInfillVal.textContent = e.target.value;
+            if (activeStlFile && calcBtn) {
+                calcBtn.classList.remove('hidden');
+            }
+        });
+    }
+    
     // Drag and drop events
     uploadZone.addEventListener('click', () => fileInput.click());
     
@@ -199,6 +232,18 @@ function setupPublicEstimator() {
 }
 
 function handleStlSelection(file) {
+    const isConfigured = materials && materials.length > 0 && 
+                        machines && machines.length > 0 && 
+                        globalSettings && Object.keys(globalSettings).length > 0;
+    if (!isConfigured) {
+        showToast('The estimator is not configured yet and cannot provide an estimation.', 'warning');
+        const configModal = document.getElementById('configure-estimator-modal');
+        if (configModal) {
+            configModal.classList.remove('hidden');
+        }
+        return;
+    }
+    
     if (!file.name.toLowerCase().endsWith('.stl')) {
         showToast('Please select a valid STL file.', 'error');
         return;
@@ -301,6 +346,18 @@ function triggerStlScan(file) {
 }
 
 function triggerEstimation(file) {
+    const isConfigured = materials && materials.length > 0 && 
+                        machines && machines.length > 0 && 
+                        globalSettings && Object.keys(globalSettings).length > 0;
+    if (!isConfigured) {
+        showToast('The estimator is not configured yet and cannot provide an estimation.', 'warning');
+        const configModal = document.getElementById('configure-estimator-modal');
+        if (configModal) {
+            configModal.classList.remove('hidden');
+        }
+        return;
+    }
+
     // Hide the Calculate button to prevent double-click
     const calcBtn = document.getElementById('public-calculate-btn');
     if (calcBtn) calcBtn.classList.add('hidden');
@@ -312,9 +369,11 @@ function triggerEstimation(file) {
     if (calcLoading) { calcLoading.classList.remove('hidden'); calcLoading.style.display = 'flex'; }
     
     // Re-send file silently (Option B — no second progress bar shown)
+    const infillVal = document.getElementById('public-infill-slider') ? document.getElementById('public-infill-slider').value : 20;
     const formData = new FormData();
     formData.append('file', file);
     formData.append('material_id', selectedPublicMaterialId);
+    formData.append('infill', infillVal);
     
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/estimate/public', true);
@@ -444,6 +503,104 @@ function setupAdminCalculator() {
     const form = document.getElementById('admin-calc-form');
     if (!form) return;
     
+    // Setup Drag-and-Drop / click listener for Admin Cost Calculator STL upload
+    const adminStlZone = document.getElementById('admin-stl-zone');
+    const adminStlInput = document.getElementById('admin-stl-input');
+    
+    if (adminStlZone && adminStlInput) {
+        adminStlZone.addEventListener('click', () => adminStlInput.click());
+        
+        adminStlZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            adminStlZone.style.borderColor = "var(--primary)";
+            adminStlZone.style.background = "rgba(255,255,255,0.02)";
+        });
+        
+        adminStlZone.addEventListener('dragleave', () => {
+            adminStlZone.style.borderColor = "rgba(255,255,255,0.1)";
+            adminStlZone.style.background = "none";
+        });
+        
+        adminStlZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            adminStlZone.style.borderColor = "rgba(255,255,255,0.1)";
+            adminStlZone.style.background = "none";
+            if (e.dataTransfer.files.length > 0) {
+                uploadStlForAdminCalc(e.dataTransfer.files[0]);
+            }
+        });
+        
+        adminStlInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                uploadStlForAdminCalc(e.target.files[0]);
+            }
+        });
+    }
+    
+    async function uploadStlForAdminCalc(file) {
+        if (!file.name.toLowerCase().endsWith('.stl')) {
+            showToast('Only STL files are supported', 'error');
+            return;
+        }
+        
+        const statusEl = document.getElementById('admin-stl-status');
+        if (statusEl) {
+            statusEl.innerText = "Analyzing STL file...";
+            statusEl.style.color = "var(--primary)";
+        }
+        
+        const activeKey = localStorage.getItem('replica_active_dev_key');
+        if (!activeKey) {
+            showToast('API Key required for STL analysis', 'error');
+            if (statusEl) {
+                statusEl.innerText = "Will auto-fill Weight and Print Time below";
+                statusEl.style.color = "var(--text-muted)";
+            }
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('material_id', document.getElementById('admin-material').value);
+        formData.append('machine_id', document.getElementById('admin-machine').value);
+        
+        const infillVal = parseFloat(document.getElementById('admin-infill').value || 20);
+        formData.append('infill', infillVal);
+        
+        try {
+            const response = await fetch('/api/developer/estimate-stl', {
+                method: 'POST',
+                headers: {
+                    'X-API-Key': activeKey
+                },
+                body: formData
+            });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                document.getElementById('admin-weight').value = data.estimated_weight_g.toFixed(1);
+                document.getElementById('admin-time').value = Math.round(data.estimated_time_mins);
+                if (statusEl) {
+                    statusEl.innerText = "Weight & Print Time auto-populated!";
+                    statusEl.style.color = "#10b981";
+                }
+                showToast('STL parsed successfully. Weight & Print Time auto-populated.', 'success');
+            } else {
+                showToast('Failed to parse STL: ' + (data.detail || 'unknown error'), 'error');
+                if (statusEl) {
+                    statusEl.innerText = "Failed to parse STL file.";
+                    statusEl.style.color = "#ef4444";
+                }
+            }
+        } catch (error) {
+            console.error('Error during developer STL estimate:', error);
+            showToast('Error connecting to the STL estimation API.', 'error');
+            if (statusEl) {
+                statusEl.innerText = "Connection error.";
+                statusEl.style.color = "#ef4444";
+            }
+        }
+    }
+    
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -452,9 +609,11 @@ function setupAdminCalculator() {
             machine_id: document.getElementById('admin-machine').value,
             weight_g: parseFloat(document.getElementById('admin-weight').value),
             print_time_mins: parseFloat(document.getElementById('admin-time').value),
-            labor_hours: parseFloat(document.getElementById('admin-labor').value || 0)
+            labor_hours: parseFloat(document.getElementById('admin-labor').value || 0),
+            prep_type: document.getElementById('admin-prep-type').value,
+            prep_hours: parseFloat(document.getElementById('admin-prep-hours').value || 0)
         };
-        // Use developer active API key if logged in
+        
         const activeKey = localStorage.getItem('replica_active_dev_key');
         if (!activeKey) {
             showToast('API Key required for the precise calculator', 'error');
@@ -493,10 +652,20 @@ function renderInvoice(bd) {
     document.getElementById('inv-direct-cost').innerText = `${bd.direct_cost.toFixed(2)} TND`;
     document.getElementById('inv-wear-cost').innerText = `${bd.wear_tear.toFixed(2)} TND`;
     document.getElementById('inv-labor-cost').innerText = `${bd.labor_cost.toFixed(2)} TND`;
+    if (document.getElementById('inv-prep-cost')) {
+        document.getElementById('inv-prep-cost').innerText = `${bd.prep_cost.toFixed(2)} TND`;
+    }
     document.getElementById('inv-subtotal').innerText = `${bd.subtotal.toFixed(2)} TND`;
     
-    const marginAmount = bd.selling_price - bd.subtotal;
-    document.getElementById('inv-margin-val').innerText = `${marginAmount.toFixed(2)} TND`;
+    const marginVal = bd.margin_val !== undefined ? bd.margin_val : (bd.selling_price_ht - bd.subtotal);
+    document.getElementById('inv-margin-val').innerText = `${marginVal.toFixed(2)} TND`;
+    
+    if (document.getElementById('inv-selling-price-ht')) {
+        document.getElementById('inv-selling-price-ht').innerText = `${bd.selling_price_ht.toFixed(2)} TND`;
+    }
+    if (document.getElementById('inv-tax-amount')) {
+        document.getElementById('inv-tax-amount').innerText = `${bd.tax_amount.toFixed(2)} TND`;
+    }
     
     document.getElementById('inv-selling-price').innerText = bd.selling_price.toFixed(2);
 }
@@ -520,10 +689,22 @@ function populateSettingsFields(data) {
     document.getElementById('cfg-wear-tear').value = cfg.wear_tear_percent;
     document.getElementById('cfg-margin').value = cfg.margin_percent;
     document.getElementById('cfg-labor').value = cfg.labor_rate_hourly;
-    document.getElementById('cfg-infill').value = cfg.infill_ratio;
+    if (document.getElementById('cfg-labor-modeling')) {
+        document.getElementById('cfg-labor-modeling').value = cfg.labor_modeling_rate !== undefined ? cfg.labor_modeling_rate : 15.0;
+    }
+    if (document.getElementById('cfg-labor-scanning')) {
+        document.getElementById('cfg-labor-scanning').value = cfg.labor_scanning_rate !== undefined ? cfg.labor_scanning_rate : 25.0;
+    }
+    if (document.getElementById('cfg-tax-percent')) {
+        document.getElementById('cfg-tax-percent').value = cfg.tax_percent !== undefined ? cfg.tax_percent : 19.0;
+    }
     document.getElementById('cfg-support').value = cfg.support_buffer_percent;
-    document.getElementById('cfg-upload-limit').value = cfg.upload_limit_count !== undefined ? cfg.upload_limit_count : 5;
-    document.getElementById('cfg-upload-cooldown').value = cfg.upload_cooldown_seconds !== undefined ? cfg.upload_cooldown_seconds : 60;
+    if (document.getElementById('cfg-upload-limit')) {
+        document.getElementById('cfg-upload-limit').value = cfg.upload_limit_count !== undefined ? cfg.upload_limit_count : 5;
+    }
+    if (document.getElementById('cfg-upload-cooldown')) {
+        document.getElementById('cfg-upload-cooldown').value = cfg.upload_cooldown_seconds !== undefined ? cfg.upload_cooldown_seconds : 60;
+    }
     
     // Populate Materials Table
     const matTbody = document.getElementById('settings-materials-tbody');
@@ -561,10 +742,12 @@ async function saveAllSettings() {
         wear_tear_percent: parseFloat(document.getElementById('cfg-wear-tear').value),
         margin_percent: parseFloat(document.getElementById('cfg-margin').value),
         labor_rate_hourly: parseFloat(document.getElementById('cfg-labor').value),
-        infill_ratio: parseFloat(document.getElementById('cfg-infill').value),
+        labor_modeling_rate: parseFloat(document.getElementById('cfg-labor-modeling').value),
+        labor_scanning_rate: parseFloat(document.getElementById('cfg-labor-scanning').value),
+        tax_percent: parseFloat(document.getElementById('cfg-tax-percent').value),
         support_buffer_percent: parseFloat(document.getElementById('cfg-support').value),
-        upload_limit_count: parseFloat(document.getElementById('cfg-upload-limit').value),
-        upload_cooldown_seconds: parseFloat(document.getElementById('cfg-upload-cooldown').value)
+        upload_limit_count: document.getElementById('cfg-upload-limit') ? parseFloat(document.getElementById('cfg-upload-limit').value) : 5,
+        upload_cooldown_seconds: document.getElementById('cfg-upload-cooldown') ? parseFloat(document.getElementById('cfg-upload-cooldown').value) : 60
     };
     
     const matRows = document.querySelectorAll('#settings-materials-tbody tr');
@@ -1109,9 +1292,11 @@ async function loadDeveloperSettings() {
             
             populateAdminSelects();
             populateSettingsFields(data);
+            checkConfigurationState();
         }
     } catch (err) {
         console.error('Failed to load developer settings:', err);
+        checkConfigurationState();
     }
 }
 
@@ -1124,7 +1309,9 @@ async function saveDeveloperSettings() {
         wear_tear_percent: parseFloat(document.getElementById('cfg-wear-tear').value),
         margin_percent: parseFloat(document.getElementById('cfg-margin').value),
         labor_rate_hourly: parseFloat(document.getElementById('cfg-labor').value),
-        infill_ratio: parseFloat(document.getElementById('cfg-infill').value),
+        labor_modeling_rate: parseFloat(document.getElementById('cfg-labor-modeling').value),
+        labor_scanning_rate: parseFloat(document.getElementById('cfg-labor-scanning').value),
+        tax_percent: parseFloat(document.getElementById('cfg-tax-percent').value),
         support_buffer_percent: parseFloat(document.getElementById('cfg-support').value)
     };
     
@@ -1355,7 +1542,17 @@ function setupSuperAdminPortal() {
     }
     
     if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
+        logoutBtn.addEventListener('click', async () => {
+            if (superadminToken) {
+                try {
+                    await fetch('/api/admin/logout', {
+                        method: 'POST',
+                        headers: { 'X-Admin-Token': superadminToken }
+                    });
+                } catch (e) {
+                    console.error('Failed backend logout call:', e);
+                }
+            }
             isSuperAdminUnlocked = false;
             superadminToken = '';
             sessionStorage.removeItem('replica_admin_token');
@@ -1379,26 +1576,62 @@ function setupSuperAdminPortal() {
         });
     }
     
-    // Auto-login from sessionStorage
-    const savedToken = sessionStorage.getItem('replica_admin_token');
-    if (savedToken) {
-        isSuperAdminUnlocked = true;
-        superadminToken = savedToken;
-        lockScreen.classList.add('hidden');
-        dashboardCard.classList.remove('hidden');
-        loadSuperAdminData();
-    }
+    // Auto-login from sessionStorage with backend verification
+    loadSuperAdminPortal();
 }
 
-function loadSuperAdminPortal() {
+function handleAdminUnauthorized() {
+    isSuperAdminUnlocked = false;
+    superadminToken = '';
+    sessionStorage.removeItem('replica_admin_token');
+    
+    const lockScreen = document.getElementById('superadmin-lock-screen');
+    const dashboardCard = document.getElementById('superadmin-dashboard-card');
+    if (lockScreen) lockScreen.classList.remove('hidden');
+    if (dashboardCard) dashboardCard.classList.add('hidden');
+    
+    showToast('Session expired or unauthorized. Please unlock again.', 'error');
+}
+
+async function loadSuperAdminPortal() {
     const savedToken = sessionStorage.getItem('replica_admin_token');
+    const lockScreen = document.getElementById('superadmin-lock-screen');
+    const dashboardCard = document.getElementById('superadmin-dashboard-card');
+    
     if (savedToken) {
-        isSuperAdminUnlocked = true;
-        superadminToken = savedToken;
-        document.getElementById('superadmin-lock-screen').classList.add('hidden');
-        document.getElementById('superadmin-dashboard-card').classList.remove('hidden');
-        loadSuperAdminData();
+        try {
+            const response = await fetch('/api/admin/users', {
+                headers: { 'X-Admin-Token': savedToken }
+            });
+            if (response.ok) {
+                isSuperAdminUnlocked = true;
+                superadminToken = savedToken;
+                if (lockScreen) lockScreen.classList.add('hidden');
+                if (dashboardCard) dashboardCard.classList.remove('hidden');
+                
+                const users = await response.json();
+                renderSuperAdminUsersTable(users);
+                
+                await Promise.all([
+                    loadSuperAdminSettings(),
+                    loadSuperAdminKeys(),
+                    loadSuperAdminUploads()
+                ]);
+                return;
+            } else if (response.status === 401 || response.status === 403) {
+                handleAdminUnauthorized();
+                return;
+            }
+        } catch (e) {
+            console.error('Failed to validate admin session:', e);
+        }
     }
+    
+    isSuperAdminUnlocked = false;
+    superadminToken = '';
+    sessionStorage.removeItem('replica_admin_token');
+    if (lockScreen) lockScreen.classList.remove('hidden');
+    if (dashboardCard) dashboardCard.classList.add('hidden');
 }
 
 async function loadSuperAdminData() {
@@ -1418,7 +1651,15 @@ async function loadSuperAdminSettings() {
             const data = await response.json();
             const cfg = data.global_settings;
             
-            document.getElementById('sa-public-infill').value = cfg.public_infill_ratio !== undefined ? cfg.public_infill_ratio : 20;
+            if (document.getElementById('sa-labor-modeling')) {
+                document.getElementById('sa-labor-modeling').value = cfg.labor_modeling_rate !== undefined ? cfg.labor_modeling_rate : 15.0;
+            }
+            if (document.getElementById('sa-labor-scanning')) {
+                document.getElementById('sa-labor-scanning').value = cfg.labor_scanning_rate !== undefined ? cfg.labor_scanning_rate : 25.0;
+            }
+            if (document.getElementById('sa-tax-percent')) {
+                document.getElementById('sa-tax-percent').value = cfg.tax_percent !== undefined ? cfg.tax_percent : 19.0;
+            }
             document.getElementById('sa-public-support').value = cfg.public_support_buffer_percent !== undefined ? cfg.public_support_buffer_percent : 10;
             document.getElementById('sa-public-min-price').value = cfg.public_min_price_cap !== undefined ? cfg.public_min_price_cap : 15;
             document.getElementById('sa-public-margin').value = cfg.margin_percent !== undefined ? cfg.margin_percent : 20;
@@ -1440,7 +1681,9 @@ async function saveSuperAdminSettings() {
     if (!isSuperAdminUnlocked) return;
     
     const global_settings = {
-        public_infill_ratio: parseFloat(document.getElementById('sa-public-infill').value),
+        labor_modeling_rate: parseFloat(document.getElementById('sa-labor-modeling').value),
+        labor_scanning_rate: parseFloat(document.getElementById('sa-labor-scanning').value),
+        tax_percent: parseFloat(document.getElementById('sa-tax-percent').value),
         public_support_buffer_percent: parseFloat(document.getElementById('sa-public-support').value),
         public_min_price_cap: parseFloat(document.getElementById('sa-public-min-price').value),
         margin_percent: parseFloat(document.getElementById('sa-public-margin').value),
@@ -1504,6 +1747,11 @@ async function saveSuperAdminSettings() {
             body: JSON.stringify(payload)
         });
         
+        if (response.status === 401 || response.status === 403) {
+            handleAdminUnauthorized();
+            return;
+        }
+        
         if (response.ok) {
             showToast('Platform Configurations saved successfully!', 'success');
             await loadSuperAdminSettings();
@@ -1524,6 +1772,10 @@ async function loadSuperAdminUsers() {
         const response = await fetch('/api/admin/users', {
             headers: { 'X-Admin-Token': superadminToken }
         });
+        if (response.status === 401 || response.status === 403) {
+            handleAdminUnauthorized();
+            return;
+        }
         if (response.ok) {
             const users = await response.json();
             renderSuperAdminUsersTable(users);
@@ -1597,6 +1849,10 @@ async function resetUserPassword(userId, newPassword) {
             },
             body: JSON.stringify({ new_password: newPassword })
         });
+        if (response.status === 401 || response.status === 403) {
+            handleAdminUnauthorized();
+            return;
+        }
         if (response.ok) {
             showToast('Password reset successfully!', 'success');
         } else {
@@ -1614,6 +1870,10 @@ async function deleteUserAccount(userId) {
             method: 'DELETE',
             headers: { 'X-Admin-Token': superadminToken }
         });
+        if (response.status === 401 || response.status === 403) {
+            handleAdminUnauthorized();
+            return;
+        }
         if (response.ok) {
             showToast('User account deleted successfully.', 'success');
             await loadSuperAdminUsers();
@@ -1632,6 +1892,10 @@ async function loadSuperAdminKeys() {
         const response = await fetch('/api/admin/keys', {
             headers: { 'X-Admin-Token': superadminToken }
         });
+        if (response.status === 401 || response.status === 403) {
+            handleAdminUnauthorized();
+            return;
+        }
         if (response.ok) {
             const keys = await response.json();
             renderSuperAdminKeysTable(keys);
@@ -1698,6 +1962,10 @@ async function toggleSuperAdminKey(key) {
             method: 'PUT',
             headers: { 'X-Admin-Token': superadminToken }
         });
+        if (response.status === 401 || response.status === 403) {
+            handleAdminUnauthorized();
+            return;
+        }
         if (response.ok) {
             await loadSuperAdminKeys();
         }
@@ -1712,6 +1980,10 @@ async function deleteSuperAdminKey(key) {
             method: 'DELETE',
             headers: { 'X-Admin-Token': superadminToken }
         });
+        if (response.status === 401 || response.status === 403) {
+            handleAdminUnauthorized();
+            return;
+        }
         if (response.ok) {
             showToast('API key deleted successfully.', 'success');
             await loadSuperAdminKeys();
@@ -1735,6 +2007,10 @@ async function generateSuperAdminKey() {
             },
             body: JSON.stringify({ owner: owner })
         });
+        if (response.status === 401 || response.status === 403) {
+            handleAdminUnauthorized();
+            return;
+        }
         if (response.ok) {
             document.getElementById('sa-key-owner').value = '';
             showToast('Global API key generated successfully!', 'success');
@@ -1754,6 +2030,10 @@ async function loadSuperAdminUploads() {
         const response = await fetch('/api/admin/uploads', {
             headers: { 'X-Admin-Token': superadminToken }
         });
+        if (response.status === 401 || response.status === 403) {
+            handleAdminUnauthorized();
+            return;
+        }
         if (response.ok) {
             const uploads = await response.json();
             renderSuperAdminUploadsTable(uploads);
@@ -1842,6 +2122,10 @@ async function deleteSelectedUploads(ids) {
             },
             body: JSON.stringify({ ids: ids })
         });
+        if (response.status === 401 || response.status === 403) {
+            handleAdminUnauthorized();
+            return;
+        }
         const data = await response.json();
         if (response.ok) {
             showToast(`Successfully deleted ${data.deleted_count} files!`, 'success');
@@ -2294,6 +2578,56 @@ function deleteSaLocalMachine(id) {
     if (confirm(`Are you sure you want to delete machine '${mach.name}' globally?`)) {
         saMachines = saMachines.filter(m => m.id !== id);
         renderSaMaterialsAndMachines(saMaterials, saMachines);
+    }
+}
+
+// Configuration State Checks and Warning Modal
+function checkConfigurationState() {
+    const isConfigured = materials && materials.length > 0 && 
+                        machines && machines.length > 0 && 
+                        globalSettings && Object.keys(globalSettings).length > 0;
+                        
+    const configModal = document.getElementById('configure-estimator-modal');
+    if (!configModal) return;
+    
+    // Get the current active tab ID
+    const activeTabBtn = document.querySelector('.nav-btn.active');
+    const activeTab = activeTabBtn ? activeTabBtn.getAttribute('data-tab') : '';
+    
+    // Only show warning if we are on the public estimator tab and the system is not configured
+    if (!isConfigured && activeTab === 'public-tab') {
+        configModal.classList.remove('hidden');
+    } else {
+        configModal.classList.add('hidden');
+    }
+}
+
+function setupConfigureEstimatorModal() {
+    const configAdminBtn = document.getElementById('config-goto-admin-btn');
+    if (configAdminBtn) {
+        configAdminBtn.addEventListener('click', () => {
+            // Hide the configuration modal
+            const configModal = document.getElementById('configure-estimator-modal');
+            if (configModal) {
+                configModal.classList.add('hidden');
+            }
+            
+            // Switch to Super Admin tab
+            const superadminBtn = document.getElementById('nav-superadmin-btn');
+            if (superadminBtn) {
+                superadminBtn.click();
+            }
+        });
+    }
+    
+    const configCloseBtn = document.getElementById('config-modal-close');
+    if (configCloseBtn) {
+        configCloseBtn.addEventListener('click', () => {
+            const configModal = document.getElementById('configure-estimator-modal');
+            if (configModal) {
+                configModal.classList.add('hidden');
+            }
+        });
     }
 }
 

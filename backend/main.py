@@ -32,7 +32,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Optional
 from sqlalchemy.orm import Session
 
-from backend.database import get_db, seed_database, Material, Machine, GlobalSetting, TimeBracket, ApiKey, User, UserSession, StlUpload, UserSetting, UserMaterial, UserMachine
+from backend.database import get_db, seed_database, Material, Machine, GlobalSetting, TimeBracket, ApiKey, User, UserSession, StlUpload, UserSetting, UserMaterial, UserMachine, AdminSession
 from backend.estimator import parse_stl_volume, calculate_public_estimate, calculate_admin_cost
 
 # In-memory dictionary to track upload timestamps: IP -> List of timestamps (datetime objects)
@@ -131,7 +131,6 @@ def get_current_user_optional(
     return db.query(User).filter(User.id == session.user_id).first()
 
 # Admin Authorization & Session Management
-admin_sessions = {}
 admin_token_header = APIKeyHeader(name="X-Admin-Token", auto_error=False)
 
 class AdminAuthRequest(BaseModel):
@@ -139,17 +138,25 @@ class AdminAuthRequest(BaseModel):
 
 def verify_admin_token(
     token_header: Optional[str] = Depends(admin_token_header),
-    admin_token: Optional[str] = None
+    admin_token: Optional[str] = None,
+    db: Session = Depends(get_db)
 ):
     token = token_header or admin_token
-    if not token or token not in admin_sessions:
+    if not token:
         raise HTTPException(status_code=401, detail="Unauthorized Super Admin access. Please unlock.")
-    session_time = admin_sessions[token]
-    if datetime.now() - session_time > timedelta(hours=2):
-        if token in admin_sessions:
-            del admin_sessions[token]
+    
+    session = db.query(AdminSession).filter(AdminSession.token == token).first()
+    if not session:
+        raise HTTPException(status_code=401, detail="Unauthorized Super Admin access. Please unlock.")
+    
+    # Check 4-hour inactivity expiration
+    if datetime.utcnow() - session.updated_at > timedelta(hours=4):
+        db.delete(session)
+        db.commit()
         raise HTTPException(status_code=401, detail="Session expired. Please unlock again.")
-    admin_sessions[token] = datetime.now()
+        
+    session.updated_at = datetime.utcnow()
+    db.commit()
     return token
 
 # Initialize app
@@ -195,6 +202,8 @@ class AdminEstimateRequest(BaseModel):
     material_id: str
     machine_id: str
     labor_hours: float = 0.0
+    prep_type: str = "none"
+    prep_hours: float = 0.0
 
 class SettingsUpdateRequest(BaseModel):
     passcode: Optional[str] = None
@@ -265,12 +274,14 @@ async def public_estimate(
     request: Request,
     material_id: str = Form(...),
     file: UploadFile = File(...),
+    infill: float = Form(20.0),
     db: Session = Depends(get_db),
     api_key: Optional[ApiKey] = Depends(verify_api_key_optional)
 ):
     """
     Public Estimate Endpoint:
-    Accepts an STL file and material type, returns price range and metrics.
+    Accepts an STL file, material type, and infill percentage (20-80%).
+    Returns price range, print time, weight, and general model metrics.
     """
     # Rate Limiting
     limit_count_setting = db.query(GlobalSetting).filter(GlobalSetting.key == "upload_limit_count").first()
@@ -318,6 +329,7 @@ async def public_estimate(
             db=db, 
             volume_cm3=mesh_analysis["volume_cm3"], 
             material_id=material_id,
+            infill=infill,
             user_id=user_id
         )
         
@@ -373,7 +385,8 @@ def admin_estimate(
 ):
     """
     Admin Precise Estimate Endpoint (Private):
-    Accepts specific sliced statistics and returns a detailed cost breakdown.
+    Accepts exact sliced weight, time, post-processing labor hours, and preparation labor type/hours (CAD Modeling / 3D Scanning).
+    Returns a detailed itemized cost breakdown, net price (HT), tax (VAT), and final selling price (TTC).
     Requires user session or valid developer API Key.
     """
     user_id = None
@@ -393,6 +406,8 @@ def admin_estimate(
             material_id=request.material_id,
             machine_id=request.machine_id,
             labor_hours=request.labor_hours,
+            prep_type=request.prep_type,
+            prep_hours=request.prep_hours,
             user_id=user_id
         )
         return {
@@ -619,7 +634,9 @@ def register_developer(req: RegisterRequest, request: Request, db: Session = Dep
     db.add(UserSetting(user_id=new_user.id, key="wear_tear_percent", value=10.0))
     db.add(UserSetting(user_id=new_user.id, key="margin_percent", value=20.0))
     db.add(UserSetting(user_id=new_user.id, key="labor_rate_hourly", value=15.0))
-    db.add(UserSetting(user_id=new_user.id, key="infill_ratio", value=20.0))
+    db.add(UserSetting(user_id=new_user.id, key="labor_modeling_rate", value=15.0))
+    db.add(UserSetting(user_id=new_user.id, key="labor_scanning_rate", value=25.0))
+    db.add(UserSetting(user_id=new_user.id, key="tax_percent", value=19.0))
     db.add(UserSetting(user_id=new_user.id, key="support_buffer_percent", value=10.0))
     
     # Seed default user materials
@@ -873,17 +890,21 @@ def get_developer_settings(
     settings_dict = {s.key: s.value for s in user_settings}
     
     # Check if we need to seed settings for legacy users
-    required_keys = ["electricity_rate", "wear_tear_percent", "margin_percent", "labor_rate_hourly", "infill_ratio", "support_buffer_percent"]
+    required_keys = ["electricity_rate", "wear_tear_percent", "margin_percent", "labor_rate_hourly", "support_buffer_percent", "labor_modeling_rate", "labor_scanning_rate", "tax_percent"]
     seeded_any = False
     for k in required_keys:
         if k not in settings_dict:
             val = 0.0
             if k == "wear_tear_percent" or k == "support_buffer_percent":
                 val = 10.0
-            elif k == "margin_percent" or k == "infill_ratio":
+            elif k == "margin_percent":
                 val = 20.0
-            elif k == "labor_rate_hourly":
+            elif k == "labor_rate_hourly" or k == "labor_modeling_rate":
                 val = 15.0
+            elif k == "labor_scanning_rate":
+                val = 25.0
+            elif k == "tax_percent":
+                val = 19.0
             new_s = UserSetting(user_id=current_user.id, key=k, value=val)
             db.add(new_s)
             settings_dict[k] = val
@@ -1006,6 +1027,56 @@ def save_developer_settings(
     db.commit()
     return {"success": True}
 
+@app.post("/api/developer/estimate-stl")
+async def developer_estimate_stl(
+    material_id: str = Form(...),
+    machine_id: str = Form(...),
+    infill: float = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    api_key: Optional[ApiKey] = Depends(verify_api_key_optional)
+):
+    """
+    Developer STL Auto-Estimate Endpoint:
+    Accepts an STL file, material, machine, and infill percentage.
+    Calculates estimated print weight and print time using the active user's settings.
+    Requires a valid user session or API Key.
+    """
+    user_id = None
+    if current_user:
+        user_id = current_user.id
+    elif api_key:
+        user_id = api_key.user_id
+        
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session or API Key required")
+        
+    if not file.filename.lower().endswith('.stl'):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only STL files are supported")
+        
+    try:
+        contents = await file.read()
+        mesh_analysis = parse_stl_volume(contents)
+        if mesh_analysis["error"]:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=mesh_analysis["error"])
+            
+        estimate = calculate_public_estimate(
+            db=db,
+            volume_cm3=mesh_analysis["volume_cm3"],
+            material_id=material_id,
+            infill=infill,
+            user_id=user_id
+        )
+        
+        return {
+            "success": True,
+            "estimated_weight_g": estimate["estimated_weight_g"],
+            "estimated_time_mins": estimate["estimated_time_mins"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
 @app.get("/api/developer/uploads")
 def get_developer_uploads(
     user: User = Depends(get_current_user),
@@ -1033,12 +1104,25 @@ def get_developer_uploads(
 # --- Admin Panel Oversight Endpoints (Passcode-Session Protected) ---
 
 @app.post("/api/admin/auth")
-def admin_auth(req: AdminAuthRequest):
+def admin_auth(req: AdminAuthRequest, db: Session = Depends(get_db)):
     if req.password == "Hey1994Ba25":
         token = secrets.token_hex(24)
-        admin_sessions[token] = datetime.now()
+        new_session = AdminSession(token=token, created_at=datetime.utcnow(), updated_at=datetime.utcnow())
+        db.add(new_session)
+        db.commit()
         return {"success": True, "token": token}
     raise HTTPException(status_code=401, detail="Invalid admin password.")
+
+@app.post("/api/admin/logout")
+def admin_logout(
+    admin_token: str = Depends(verify_admin_token),
+    db: Session = Depends(get_db)
+):
+    session = db.query(AdminSession).filter(AdminSession.token == admin_token).first()
+    if session:
+        db.delete(session)
+        db.commit()
+    return {"success": True}
 
 @app.get("/api/admin/users")
 def get_admin_users(

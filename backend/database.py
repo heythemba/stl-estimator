@@ -140,6 +140,15 @@ class UserMachine(Base):
     provider = Column(String, nullable=True)         # e.g., 'Bambulab'
     enclosed = Column(Boolean, default=False, nullable=False)
 
+class AdminSession(Base):
+    """
+    Tracks active login sessions for the Super Admin to persist across server reloads.
+    """
+    __tablename__ = "admin_sessions"
+    token = Column(String, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
 # Dependency to get db session
 def get_db():
     db = SessionLocal()
@@ -211,75 +220,8 @@ def seed_database():
         db.rollback()
 
     try:
-        # 1. Seed Materials
-        if db.query(Material).count() == 0:
-            materials = [
-                Material(id="pla", name="PLA", density_g_cm3=1.24, price_per_kg=60.0),
-                Material(id="petg", name="PETG", density_g_cm3=1.27, price_per_kg=65.0),
-                Material(id="abs", name="ABS", density_g_cm3=1.04, price_per_kg=70.0),
-                Material(id="asa", name="ASA", density_g_cm3=1.07, price_per_kg=75.0),
-                Material(id="tpu", name="TPU", density_g_cm3=1.21, price_per_kg=85.0),
-            ]
-            db.bulk_save_objects(materials)
-            db.commit()
-
-        # 2. Seed Machines
-        if db.query(Machine).count() == 0:
-            machines = [
-                Machine(id="a1_combo", name="A1 Combo", power_watts=150.0, flat_premium=0.0, provider="Bambulab", enclosed=False),
-                Machine(id="h2s", name="H2S", power_watts=350.0, flat_premium=15.0, provider="Custom", enclosed=True),
-            ]
-            db.bulk_save_objects(machines)
-            db.commit()
-
-        # 3. Seed Global Settings
-        existing_keys = [s.key for s in db.query(GlobalSetting).all()]
-        default_settings = [
-            ("electricity_rate", 0.0),
-            ("wear_tear_percent", 10.0),
-            ("margin_percent", 20.0),
-            ("labor_rate_hourly", 15.0),
-            ("infill_ratio", 20.0),
-            ("support_buffer_percent", 10.0),
-            ("upload_limit_count", 5.0),
-            ("upload_cooldown_seconds", 60.0),
-            ("public_infill_ratio", 20.0),
-            ("public_support_buffer_percent", 10.0),
-            ("public_min_price_cap", 15.0),
-            ("public_price_range_min_offset", 90.0),
-            ("public_price_range_max_offset", 115.0),
-        ]
-        for key, value in default_settings:
-            if key not in existing_keys:
-                db.add(GlobalSetting(key=key, value=value))
-        db.commit()
-
-        # 4. Seed Time Brackets
-        if db.query(TimeBracket).count() == 0:
-            brackets = [
-                # A1 Combo brackets
-                TimeBracket(machine_id="a1_combo", max_weight_g=20.0, base_time_mins=30.0, time_per_g_mins=3.0),
-                TimeBracket(machine_id="a1_combo", max_weight_g=100.0, base_time_mins=45.0, time_per_g_mins=1.5),
-                TimeBracket(machine_id="a1_combo", max_weight_g=99999.0, base_time_mins=90.0, time_per_g_mins=1.0),
-                
-                # H2S brackets (usually slower / larger setup time)
-                TimeBracket(machine_id="h2s", max_weight_g=20.0, base_time_mins=45.0, time_per_g_mins=4.0),
-                TimeBracket(machine_id="h2s", max_weight_g=100.0, base_time_mins=60.0, time_per_g_mins=2.0),
-                TimeBracket(machine_id="h2s", max_weight_g=99999.0, base_time_mins=120.0, time_per_g_mins=1.5),
-            ]
-            db.bulk_save_objects(brackets)
-            db.commit()
-
-        # 5. Seed API Keys
-        if db.query(ApiKey).count() == 0:
-            default_key = ApiKey(
-                key="replica_default_key",
-                owner="Replica Default App",
-                is_active=True,
-                calls_count=0
-            )
-            db.add(default_key)
-            db.commit()
+        # Default seeding disabled. Administrator must configure settings.
+        pass
             
     except Exception as e:
         db.rollback()
