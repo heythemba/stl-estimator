@@ -1657,6 +1657,9 @@ async function loadSuperAdminSettings() {
             if (document.getElementById('sa-labor-scanning')) {
                 document.getElementById('sa-labor-scanning').value = cfg.labor_scanning_rate !== undefined ? cfg.labor_scanning_rate : 25.0;
             }
+            if (document.getElementById('sa-electricity')) {
+                document.getElementById('sa-electricity').value = cfg.electricity_rate !== undefined ? cfg.electricity_rate : 0.0;
+            }
             if (document.getElementById('sa-tax-percent')) {
                 document.getElementById('sa-tax-percent').value = cfg.tax_percent !== undefined ? cfg.tax_percent : 19.0;
             }
@@ -1683,6 +1686,7 @@ async function saveSuperAdminSettings() {
     const global_settings = {
         labor_modeling_rate: parseFloat(document.getElementById('sa-labor-modeling').value),
         labor_scanning_rate: parseFloat(document.getElementById('sa-labor-scanning').value),
+        electricity_rate: parseFloat(document.getElementById('sa-electricity').value || 0),
         tax_percent: parseFloat(document.getElementById('sa-tax-percent').value),
         public_support_buffer_percent: parseFloat(document.getElementById('sa-public-support').value),
         public_min_price_cap: parseFloat(document.getElementById('sa-public-min-price').value),
