@@ -682,131 +682,7 @@ function setupSettingsPanel() {
 }
 
 
-function populateSettingsFields(data) {
-    const cfg = data.global_settings;
-    
-    document.getElementById('cfg-electricity').value = cfg.electricity_rate;
-    document.getElementById('cfg-wear-tear').value = cfg.wear_tear_percent;
-    document.getElementById('cfg-margin').value = cfg.margin_percent;
-    document.getElementById('cfg-labor').value = cfg.labor_rate_hourly;
-    if (document.getElementById('cfg-labor-modeling')) {
-        document.getElementById('cfg-labor-modeling').value = cfg.labor_modeling_rate !== undefined ? cfg.labor_modeling_rate : 15.0;
-    }
-    if (document.getElementById('cfg-labor-scanning')) {
-        document.getElementById('cfg-labor-scanning').value = cfg.labor_scanning_rate !== undefined ? cfg.labor_scanning_rate : 25.0;
-    }
-    if (document.getElementById('cfg-tax-percent')) {
-        document.getElementById('cfg-tax-percent').value = cfg.tax_percent !== undefined ? cfg.tax_percent : 19.0;
-    }
-    document.getElementById('cfg-support').value = cfg.support_buffer_percent;
-    if (document.getElementById('cfg-upload-limit')) {
-        document.getElementById('cfg-upload-limit').value = cfg.upload_limit_count !== undefined ? cfg.upload_limit_count : 5;
-    }
-    if (document.getElementById('cfg-upload-cooldown')) {
-        document.getElementById('cfg-upload-cooldown').value = cfg.upload_cooldown_seconds !== undefined ? cfg.upload_cooldown_seconds : 60;
-    }
-    
-    // Populate Materials Table
-    const matTbody = document.getElementById('settings-materials-tbody');
-    matTbody.innerHTML = '';
-    data.materials.forEach(mat => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td style="font-weight: 700;">${mat.name}</td>
-            <td><input type="number" step="0.01" class="tbl-input mat-density" data-id="${mat.id}" value="${mat.density_g_cm3}"></td>
-            <td><input type="number" step="1" class="tbl-input mat-price" data-id="${mat.id}" value="${mat.price_per_kg}"></td>
-        `;
-        matTbody.appendChild(row);
-    });
-    
-    // Populate Machines Table
-    const machTbody = document.getElementById('settings-machines-tbody');
-    machTbody.innerHTML = '';
-    data.machines.forEach(mach => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td style="font-weight: 700;">${mach.name}</td>
-            <td><input type="number" step="10" class="tbl-input mach-power" data-id="${mach.id}" value="${mach.power_watts}"></td>
-            <td><input type="number" step="1" class="tbl-input mach-premium" data-id="${mach.id}" value="${mach.flat_premium}"></td>
-        `;
-        machTbody.appendChild(row);
-    });
-}
 
-async function saveAllSettings() {
-    if (!isSettingsUnlocked) return;
-    
-    // Construct payload
-    const global_settings = {
-        electricity_rate: parseFloat(document.getElementById('cfg-electricity').value),
-        wear_tear_percent: parseFloat(document.getElementById('cfg-wear-tear').value),
-        margin_percent: parseFloat(document.getElementById('cfg-margin').value),
-        labor_rate_hourly: parseFloat(document.getElementById('cfg-labor').value),
-        labor_modeling_rate: parseFloat(document.getElementById('cfg-labor-modeling').value),
-        labor_scanning_rate: parseFloat(document.getElementById('cfg-labor-scanning').value),
-        tax_percent: parseFloat(document.getElementById('cfg-tax-percent').value),
-        support_buffer_percent: parseFloat(document.getElementById('cfg-support').value),
-        upload_limit_count: document.getElementById('cfg-upload-limit') ? parseFloat(document.getElementById('cfg-upload-limit').value) : 5,
-        upload_cooldown_seconds: document.getElementById('cfg-upload-cooldown') ? parseFloat(document.getElementById('cfg-upload-cooldown').value) : 60
-    };
-    
-    const matRows = document.querySelectorAll('#settings-materials-tbody tr');
-    const materialsPayload = [];
-    matRows.forEach(row => {
-        const densityInput = row.querySelector('.mat-density');
-        const priceInput = row.querySelector('.mat-price');
-        const id = densityInput.getAttribute('data-id');
-        const name = row.querySelector('td').innerText;
-        materialsPayload.push({
-            id: id,
-            name: name,
-            density_g_cm3: parseFloat(densityInput.value),
-            price_per_kg: parseFloat(priceInput.value)
-        });
-    });
-    
-    const machRows = document.querySelectorAll('#settings-machines-tbody tr');
-    const machinesPayload = [];
-    machRows.forEach(row => {
-        const powerInput = row.querySelector('.mach-power');
-        const premiumInput = row.querySelector('.mach-premium');
-        const id = powerInput.getAttribute('data-id');
-        const name = row.querySelector('td').innerText;
-        machinesPayload.push({
-            id: id,
-            name: name,
-            power_watts: parseFloat(powerInput.value),
-            flat_premium: parseFloat(premiumInput.value)
-        });
-    });
-    
-    const payload = {
-        passcode: enteredPasscode,
-        global_settings: global_settings,
-        materials: materialsPayload,
-        machines: machinesPayload
-    };
-    
-    try {
-        const response = await fetch('/api/settings', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        
-        if (response.ok) {
-            showToast('Configurations saved successfully!', 'success');
-            // Refresh configs
-            await fetchConfig();
-        } else {
-            const err = await response.json();
-            showToast('Failed to save settings: ' + err.detail, 'error');
-        }
-    } catch (e) {
-        console.error('Error saving configurations:', e);
-        showToast('Network error while saving settings.', 'error');
-    }
-}
 
 // 6. Three.js 3D Viewer Implementation
 function initThreeJS() {
@@ -1427,65 +1303,79 @@ function renderDeveloperUploadsTable(uploads) {
 function populateSettingsFields(data) {
     const cfg = data.global_settings;
     
-    document.getElementById('cfg-electricity').value = cfg.electricity_rate;
-    document.getElementById('cfg-wear-tear').value = cfg.wear_tear_percent;
-    document.getElementById('cfg-margin').value = cfg.margin_percent;
-    document.getElementById('cfg-labor').value = cfg.labor_rate_hourly;
-    document.getElementById('cfg-infill').value = cfg.infill_ratio;
-    document.getElementById('cfg-support').value = cfg.support_buffer_percent;
+    const setVal = (id, val, defaultVal = 0) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val !== undefined ? val : defaultVal;
+    };
     
+    setVal('cfg-electricity', cfg.electricity_rate, 0.0);
+    setVal('cfg-wear-tear', cfg.wear_tear_percent, 10.0);
+    setVal('cfg-margin', cfg.margin_percent, 20.0);
+    setVal('cfg-labor', cfg.labor_rate_hourly, 15.0);
+    setVal('cfg-labor-modeling', cfg.labor_modeling_rate, 15.0);
+    setVal('cfg-labor-scanning', cfg.labor_scanning_rate, 25.0);
+    setVal('cfg-tax-percent', cfg.tax_percent, 19.0);
+    setVal('cfg-support', cfg.support_buffer_percent, 10.0);
+    setVal('cfg-infill', cfg.infill_ratio, 20.0);
+    
+    // Populate Materials Table
     const matTbody = document.getElementById('settings-materials-tbody');
-    matTbody.innerHTML = '';
-    data.materials.forEach(mat => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td style="font-weight: 700;">${escapeHtml(mat.name)}</td>
-            <td><input type="number" step="0.01" class="tbl-input mat-density" data-id="${mat.id}" value="${mat.density_g_cm3}"></td>
-            <td><input type="number" step="1" class="tbl-input mat-price" data-id="${mat.id}" value="${mat.price_per_kg}"></td>
-            <td style="text-align: center;">
-                <button type="button" class="tbl-btn btn-danger delete-material-btn" data-id="${mat.id}" title="Delete Filament" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
-                    <i class="fa-solid fa-trash"></i>
-                </button>
-            </td>
-        `;
-        matTbody.appendChild(row);
-    });
+    if (matTbody) {
+        matTbody.innerHTML = '';
+        data.materials.forEach(mat => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td style="font-weight: 700;">${escapeHtml(mat.name)}</td>
+                <td><input type="number" step="0.01" class="tbl-input mat-density" data-id="${mat.id}" value="${mat.density_g_cm3}"></td>
+                <td><input type="number" step="1" class="tbl-input mat-price" data-id="${mat.id}" value="${mat.price_per_kg}"></td>
+                <td style="text-align: center;">
+                    <button type="button" class="tbl-btn btn-danger delete-material-btn" data-id="${mat.id}" title="Delete Filament" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            matTbody.appendChild(row);
+        });
+        
+        // Bind Delete listeners
+        matTbody.querySelectorAll('.delete-material-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-id');
+                deleteLocalMaterial(id);
+            });
+        });
+    }
     
+    // Populate Machines Table
     const machTbody = document.getElementById('settings-machines-tbody');
-    machTbody.innerHTML = '';
-    data.machines.forEach(mach => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td style="font-weight: 700;">${escapeHtml(mach.name)}</td>
-            <td><input type="text" class="tbl-input mach-provider" data-id="${mach.id}" value="${escapeHtml(mach.provider || '')}" placeholder="e.g. Bambulab"></td>
-            <td><input type="number" step="10" class="tbl-input mach-power" data-id="${mach.id}" value="${mach.power_watts}"></td>
-            <td><input type="number" step="1" class="tbl-input mach-premium" data-id="${mach.id}" value="${mach.flat_premium}"></td>
-            <td style="text-align: center;">
-                <input type="checkbox" class="mach-enclosed" data-id="${mach.id}" ${mach.enclosed ? 'checked' : ''} style="cursor: pointer; width: auto; transform: scale(1.1);">
-            </td>
-            <td style="text-align: center;">
-                <button type="button" class="tbl-btn btn-danger delete-machine-btn" data-id="${mach.id}" title="Delete Machine" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
-                    <i class="fa-solid fa-trash"></i>
-                </button>
-            </td>
-        `;
-        machTbody.appendChild(row);
-    });
-    
-    // Bind Delete listeners
-    matTbody.querySelectorAll('.delete-material-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const id = btn.getAttribute('data-id');
-            deleteLocalMaterial(id);
+    if (machTbody) {
+        machTbody.innerHTML = '';
+        data.machines.forEach(mach => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td style="font-weight: 700;">${escapeHtml(mach.name)}</td>
+                <td><input type="text" class="tbl-input mach-provider" data-id="${mach.id}" value="${escapeHtml(mach.provider || '')}" placeholder="e.g. Bambulab"></td>
+                <td><input type="number" step="10" class="tbl-input mach-power" data-id="${mach.id}" value="${mach.power_watts}"></td>
+                <td><input type="number" step="1" class="tbl-input mach-premium" data-id="${mach.id}" value="${mach.flat_premium}"></td>
+                <td style="text-align: center;">
+                    <input type="checkbox" class="mach-enclosed" data-id="${mach.id}" ${mach.enclosed ? 'checked' : ''} style="cursor: pointer; width: auto; transform: scale(1.1);">
+                </td>
+                <td style="text-align: center;">
+                    <button type="button" class="tbl-btn btn-danger delete-machine-btn" data-id="${mach.id}" title="Delete Machine" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            machTbody.appendChild(row);
         });
-    });
-    
-    machTbody.querySelectorAll('.delete-machine-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const id = btn.getAttribute('data-id');
-            deleteLocalMachine(id);
+        
+        machTbody.querySelectorAll('.delete-machine-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-id');
+                deleteLocalMachine(id);
+            });
         });
-    });
+    }
 }
 
 // 8. Super Admin Administration Section
@@ -2326,13 +2216,17 @@ function deleteLocalMachine(id) {
 }
 
 function getLocalGlobalSettings() {
+    const getVal = (id, fallback = 0) => {
+        const el = document.getElementById(id);
+        return el ? parseFloat(el.value) || fallback : fallback;
+    };
     return {
-        electricity_rate: parseFloat(document.getElementById('cfg-electricity').value || 0),
-        wear_tear_percent: parseFloat(document.getElementById('cfg-wear-tear').value || 0),
-        margin_percent: parseFloat(document.getElementById('cfg-margin').value || 0),
-        labor_rate_hourly: parseFloat(document.getElementById('cfg-labor').value || 0),
-        infill_ratio: parseFloat(document.getElementById('cfg-infill').value || 0),
-        support_buffer_percent: parseFloat(document.getElementById('cfg-support').value || 0)
+        electricity_rate: getVal('cfg-electricity'),
+        wear_tear_percent: getVal('cfg-wear-tear'),
+        margin_percent: getVal('cfg-margin'),
+        labor_rate_hourly: getVal('cfg-labor'),
+        infill_ratio: getVal('cfg-infill'),
+        support_buffer_percent: getVal('cfg-support')
     };
 }
 
