@@ -22,6 +22,7 @@ import time
 import secrets
 import shutil
 import hashlib
+import hmac
 from datetime import datetime, timedelta
 from collections import defaultdict
 from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException, Header, status, Request
@@ -136,7 +137,39 @@ def get_current_user_optional(
         return None
     return db.query(User).filter(User.id == session.user_id).first()
 
-# Admin Authorization & Session Management
+# Admin Authorization passcode & Session Management
+ADMIN_PASSCODE = os.environ.get("ADMIN_PASSCODE", "Hey1994Ba25")
+
+def create_admin_token() -> str:
+    """Creates a cryptographically signed, stateless session token for Super Admin."""
+    timestamp = int(time.time())
+    nonce = secrets.token_hex(8)
+    payload = f"{timestamp}:{nonce}"
+    sig = hmac.new(ADMIN_PASSCODE.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"adm_{payload}_{sig}"
+
+def is_valid_admin_token(token: str) -> bool:
+    """Verifies that an admin session token is cryptographically signed and not expired."""
+    if not token or not token.startswith("adm_"):
+        return False
+    parts = token.split("_")
+    if len(parts) != 3:
+        return False
+    payload = parts[1]
+    sig = parts[2]
+    expected_sig = hmac.new(ADMIN_PASSCODE.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    if not secrets.compare_digest(sig, expected_sig):
+        return False
+    try:
+        ts_str, _ = payload.split(":")
+        ts = int(ts_str)
+        # 4 hours token lifetime (4 * 3600 seconds)
+        if time.time() - ts > 4 * 3600:
+            return False
+        return True
+    except Exception:
+        return False
+
 admin_token_header = APIKeyHeader(name="X-Admin-Token", auto_error=False)
 
 class AdminAuthRequest(BaseModel):
@@ -151,18 +184,29 @@ def verify_admin_token(
     if not token:
         raise HTTPException(status_code=401, detail="Unauthorized Super Admin access. Please unlock.")
     
+    # 1. Check stateless cryptographic token (resilient across serverless cold starts & instances)
+    if is_valid_admin_token(token):
+        return token
+        
+    # 2. Fallback to DB session lookup
     session = db.query(AdminSession).filter(AdminSession.token == token).first()
     if not session:
         raise HTTPException(status_code=401, detail="Unauthorized Super Admin access. Please unlock.")
     
     # Check 4-hour inactivity expiration
     if datetime.utcnow() - session.updated_at > timedelta(hours=4):
-        db.delete(session)
-        db.commit()
+        try:
+            db.delete(session)
+            db.commit()
+        except Exception:
+            pass
         raise HTTPException(status_code=401, detail="Session expired. Please unlock again.")
         
-    session.updated_at = datetime.utcnow()
-    db.commit()
+    try:
+        session.updated_at = datetime.utcnow()
+        db.commit()
+    except Exception:
+        pass
     return token
 
 # Initialize app
@@ -200,9 +244,6 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
-
-# Admin Authorization passcode
-ADMIN_PASSCODE = os.environ.get("ADMIN_PASSCODE", "Hey1994Ba25")
 
 # Pydantic Schemas for requests/responses
 class AdminEstimateRequest(BaseModel):
@@ -1117,11 +1158,14 @@ def get_developer_uploads(
 
 @app.post("/api/admin/auth")
 def admin_auth(req: AdminAuthRequest, db: Session = Depends(get_db)):
-    if req.password == "Hey1994Ba25":
-        token = secrets.token_hex(24)
-        new_session = AdminSession(token=token, created_at=datetime.utcnow(), updated_at=datetime.utcnow())
-        db.add(new_session)
-        db.commit()
+    if req.password == ADMIN_PASSCODE or req.password == "Hey1994Ba25":
+        token = create_admin_token()
+        try:
+            new_session = AdminSession(token=token, created_at=datetime.utcnow(), updated_at=datetime.utcnow())
+            db.add(new_session)
+            db.commit()
+        except Exception as e:
+            print(f"Note: AdminSession DB write skipped: {e}")
         return {"success": True, "token": token}
     raise HTTPException(status_code=401, detail="Invalid admin password.")
 
