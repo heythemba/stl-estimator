@@ -13,13 +13,24 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 # Load environment variables
-env_path = Path(__file__).resolve().parent.parent / '.env'
+BASE_DIR = Path(__file__).resolve().parent.parent
+env_path = BASE_DIR / '.env'
 load_dotenv(dotenv_path=env_path)
 
 # Database Configuration
 # Default to local SQLite, but can be overridden by DATABASE_URL (e.g. Supabase/PostgreSQL)
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///replica_estimator_v4.db")
-if DATABASE_URL.startswith("postgres://"):
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if not DATABASE_URL:
+    db_file = BASE_DIR / "replica_estimator_v4.db"
+    try:
+        # Check if local directory is writable
+        test_file = BASE_DIR / ".db_write_test"
+        test_file.touch()
+        test_file.unlink()
+        DATABASE_URL = f"sqlite:///{db_file.as_posix()}"
+    except Exception:
+        DATABASE_URL = "sqlite:////tmp/replica_estimator_v4.db"
+elif DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # For SQLite, we need to allow multithreading, but PostgreSQL doesn't need it.

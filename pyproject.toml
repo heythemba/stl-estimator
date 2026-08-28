@@ -1,0 +1,21 @@
+[project]
+name = "stl-estimator"
+version = "1.0.0"
+description = "STL Cost Estimator & Volume Scanning API for Replica 3D Fabrication"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "trimesh",
+    "numpy",
+    "sqlalchemy",
+    "python-multipart",
+    "requests",
+    "scipy",
+    "psycopg2-binary",
+    "python-dotenv"
+]
+
+[tool.vercel]
+entrypoint = "backend.main:app"

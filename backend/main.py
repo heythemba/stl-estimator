@@ -14,7 +14,8 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 # Load environment variables
-env_path = Path(__file__).resolve().parent.parent / '.env'
+BASE_DIR = Path(__file__).resolve().parent.parent
+env_path = BASE_DIR / '.env'
 load_dotenv(dotenv_path=env_path)
 
 import time
@@ -38,8 +39,13 @@ from backend.estimator import parse_stl_volume, calculate_public_estimate, calcu
 # In-memory dictionary to track upload timestamps: IP -> List of timestamps (datetime objects)
 upload_tracker = defaultdict(list)
 
-# Make sure uploads directory exists
-os.makedirs("uploads", exist_ok=True)
+# Make sure uploads directory exists safely
+UPLOAD_DIR = os.environ.get("UPLOAD_DIR", str(BASE_DIR / "uploads"))
+try:
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+except Exception:
+    UPLOAD_DIR = "/tmp/uploads"
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Password Hashing Helpers using standard hashlib (no external compilation dependencies)
 def hash_password(password: str) -> str:
@@ -174,10 +180,13 @@ async def catch_exceptions_middleware(request, call_next):
     try:
         return await call_next(request)
     except Exception as e:
-        with open("backend_error.log", "a") as f:
-            f.write(f"\n--- Exception ---\n")
-            traceback.print_exc(file=f)
-            f.flush()
+        try:
+            with open("backend_error.log", "a") as f:
+                f.write(f"\n--- Exception ---\n")
+                traceback.print_exc(file=f)
+                f.flush()
+        except Exception:
+            pass
         raise e
 
 # Seed database tables and initial records
@@ -336,10 +345,13 @@ async def public_estimate(
         # Save file to uploads/ folder with timestamp prefix
         timestamp = int(time.time())
         stored_filename = f"{timestamp}_{file.filename}"
-        stored_path = os.path.join("uploads", stored_filename)
+        stored_path = os.path.join(UPLOAD_DIR, stored_filename)
         
-        with open(stored_path, "wb") as buffer:
-            buffer.write(contents)
+        try:
+            with open(stored_path, "wb") as buffer:
+                buffer.write(contents)
+        except Exception as write_err:
+            print(f"Warning: could not persist uploaded file to disk: {write_err}")
             
         # Log upload in db
         new_upload = StlUpload(
@@ -1259,7 +1271,7 @@ def download_stl_file(id: int, db: Session = Depends(get_db), admin_token: str =
     record = db.query(StlUpload).filter(StlUpload.id == id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Upload record not found.")
-    file_path = os.path.join("uploads", record.stored_filename)
+    file_path = os.path.join(UPLOAD_DIR, record.stored_filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Physical file not found on disk.")
     return FileResponse(
@@ -1279,7 +1291,7 @@ def bulk_delete_uploads(request: BulkDeleteUploadsRequest, db: Session = Depends
     records = db.query(StlUpload).filter(StlUpload.id.in_(request.ids)).all()
     deleted_count = 0
     for record in records:
-        stored_path = os.path.join("uploads", record.stored_filename)
+        stored_path = os.path.join(UPLOAD_DIR, record.stored_filename)
         if os.path.exists(stored_path):
             try:
                 os.remove(stored_path)
@@ -1292,5 +1304,6 @@ def bulk_delete_uploads(request: BulkDeleteUploadsRequest, db: Session = Depends
     return {"success": True, "deleted_count": deleted_count}
 
 # Serve Frontend static assets
-if os.path.exists("frontend"):
-    app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
+frontend_dir = BASE_DIR / "frontend"
+if frontend_dir.exists():
+    app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
