@@ -39,16 +39,16 @@ def parse_stl_volume(file_bytes: bytes):
                 volume_cm3 = 0.0
             else:
                 # Try convex hull volume as fallback
-                volume_cm3 = abs(mesh.convex_hull.volume) / 1000.0
+                volume_cm3 = float(abs(mesh.convex_hull.volume) / 1000.0)
         else:
-            volume_cm3 = abs(volume_mm3) / 1000.0
+            volume_cm3 = float(abs(volume_mm3) / 1000.0)
             
-        surface_area_cm2 = mesh.area / 100.0 # mm^2 to cm^2
+        surface_area_cm2 = float(mesh.area / 100.0) # mm^2 to cm^2
         
         return {
-            "volume_cm3": volume_cm3,
-            "surface_area_cm2": surface_area_cm2,
-            "is_watertight": is_watertight,
+            "volume_cm3": float(volume_cm3),
+            "surface_area_cm2": float(surface_area_cm2),
+            "is_watertight": bool(is_watertight),
             "error": None
         }
     except Exception as e:
@@ -62,12 +62,12 @@ def parse_stl_volume(file_bytes: bytes):
 def get_setting(db: Session, key: str, default: float) -> float:
     """Helper function to fetch a global setting from the DB, returning a default if not found."""
     setting = db.query(GlobalSetting).filter(GlobalSetting.key == key).first()
-    return setting.value if setting else default
+    return float(setting.value) if setting else float(default)
 
 def get_user_setting(db: Session, user_id: int, key: str, default: float) -> float:
     """Helper function to fetch a user-specific setting from the DB, returning a default if not found."""
     setting = db.query(UserSetting).filter(UserSetting.user_id == user_id, UserSetting.key == key).first()
-    return setting.value if setting else default
+    return float(setting.value) if setting else float(default)
 
 def calculate_public_estimate(db: Session, volume_cm3: float, material_id: str, infill: float = 20.0, user_id: int = None):
     """
@@ -87,6 +87,9 @@ def calculate_public_estimate(db: Session, volume_cm3: float, material_id: str, 
     Returns:
         dict: A dictionary containing weight, time, machine name, price_min, price_max, and material_cost.
     """
+    volume_cm3 = float(volume_cm3)
+    infill = float(infill)
+
     # 1. Fetch material info
     if user_id:
         material = db.query(UserMaterial).filter(UserMaterial.user_id == user_id, UserMaterial.material_id == material_id.lower()).first()
@@ -100,29 +103,29 @@ def calculate_public_estimate(db: Session, volume_cm3: float, material_id: str, 
 
     # 2. Fetch settings
     if user_id:
-        electricity_rate = get_user_setting(db, user_id, "electricity_rate", 0.0)
-        wear_tear_percent = get_user_setting(db, user_id, "wear_tear_percent", 10.0) / 100.0
-        margin_percent = get_user_setting(db, user_id, "margin_percent", 20.0) / 100.0
-        tax_percent = get_user_setting(db, user_id, "tax_percent", 19.0) / 100.0
-        support_buffer = get_user_setting(db, user_id, "support_buffer_percent", 10.0) / 100.0
+        electricity_rate = float(get_user_setting(db, user_id, "electricity_rate", 0.0))
+        wear_tear_percent = float(get_user_setting(db, user_id, "wear_tear_percent", 10.0)) / 100.0
+        margin_percent = float(get_user_setting(db, user_id, "margin_percent", 20.0)) / 100.0
+        tax_percent = float(get_user_setting(db, user_id, "tax_percent", 19.0)) / 100.0
+        support_buffer = float(get_user_setting(db, user_id, "support_buffer_percent", 10.0)) / 100.0
         min_price_cap = 15.0
         min_offset_mult = 0.90
         max_offset_mult = 1.15
     else:
-        electricity_rate = get_setting(db, "electricity_rate", 0.0)
-        wear_tear_percent = get_setting(db, "wear_tear_percent", 10.0) / 100.0
-        margin_percent = get_setting(db, "margin_percent", 20.0) / 100.0
-        tax_percent = get_setting(db, "tax_percent", 19.0) / 100.0
-        support_buffer = get_setting(db, "public_support_buffer_percent", 10.0) / 100.0
-        min_price_cap = get_setting(db, "public_min_price_cap", 15.0)
-        min_offset_mult = get_setting(db, "public_price_range_min_offset", 90.0) / 100.0
-        max_offset_mult = get_setting(db, "public_price_range_max_offset", 115.0) / 100.0
+        electricity_rate = float(get_setting(db, "electricity_rate", 0.0))
+        wear_tear_percent = float(get_setting(db, "wear_tear_percent", 10.0)) / 100.0
+        margin_percent = float(get_setting(db, "margin_percent", 20.0)) / 100.0
+        tax_percent = float(get_setting(db, "tax_percent", 19.0)) / 100.0
+        support_buffer = float(get_setting(db, "public_support_buffer_percent", 10.0)) / 100.0
+        min_price_cap = float(get_setting(db, "public_min_price_cap", 15.0))
+        min_offset_mult = float(get_setting(db, "public_price_range_min_offset", 90.0)) / 100.0
+        max_offset_mult = float(get_setting(db, "public_price_range_max_offset", 115.0)) / 100.0
     
-    infill_ratio = infill / 100.0
+    infill_ratio = float(infill / 100.0)
 
     # 3. Calculate weight (g)
-    base_weight = volume_cm3 * material.density_g_cm3 * infill_ratio
-    est_weight = base_weight * (1.0 + support_buffer)
+    base_weight = float(volume_cm3 * float(material.density_g_cm3) * infill_ratio)
+    est_weight = float(base_weight * (1.0 + support_buffer))
     
     # 4. Auto-select Machine
     needs_enclosed = material_id.lower() not in ["pla", "petg"]
@@ -152,7 +155,7 @@ def calculate_public_estimate(db: Session, volume_cm3: float, material_id: str, 
     # 5. Estimate Print Time via Bracket Lookup
     bracket = (
         db.query(TimeBracket)
-        .filter(TimeBracket.machine_id == machine_id, TimeBracket.max_weight_g >= est_weight)
+        .filter(TimeBracket.machine_id == machine_id, TimeBracket.max_weight_g >= float(est_weight))
         .order_by(TimeBracket.max_weight_g.asc())
         .first()
     )
@@ -165,37 +168,37 @@ def calculate_public_estimate(db: Session, volume_cm3: float, material_id: str, 
         )
     
     if bracket:
-        est_time_mins = bracket.base_time_mins + (bracket.time_per_g_mins * est_weight)
+        est_time_mins = float(bracket.base_time_mins) + (float(bracket.time_per_g_mins) * float(est_weight))
     else:
-        est_time_mins = 45.0 + (2.0 * est_weight)
+        est_time_mins = float(45.0 + (2.0 * float(est_weight)))
 
     # 6. Calculate Pricing (Precise Public Cost Estimator Formula)
-    material_cost = (est_weight / 1000.0) * material.price_per_kg
-    print_time_hours = est_time_mins / 60.0
-    machine_power_kw = machine.power_watts / 1000.0
-    electricity_cost = machine_power_kw * print_time_hours * electricity_rate
+    material_cost = float((est_weight / 1000.0) * float(material.price_per_kg))
+    print_time_hours = float(est_time_mins / 60.0)
+    machine_power_kw = float(float(machine.power_watts) / 1000.0)
+    electricity_cost = float(machine_power_kw * print_time_hours * electricity_rate)
     
-    direct_cost = material_cost + electricity_cost
-    wear_tear = direct_cost * wear_tear_percent
-    subtotal = direct_cost + wear_tear
+    direct_cost = float(material_cost + electricity_cost)
+    wear_tear = float(direct_cost * wear_tear_percent)
+    subtotal = float(direct_cost + wear_tear)
     
-    selling_price_ht = subtotal * (1.0 + margin_percent) + machine.flat_premium
-    tax_amount = selling_price_ht * tax_percent
-    base_price = selling_price_ht + tax_amount
+    selling_price_ht = float(subtotal * (1.0 + margin_percent) + float(machine.flat_premium))
+    tax_amount = float(selling_price_ht * tax_percent)
+    base_price = float(selling_price_ht + tax_amount)
     
     if base_price < min_price_cap:
-        base_price = min_price_cap
+        base_price = float(min_price_cap)
         
-    price_min = max(min_price_cap, round(base_price * min_offset_mult))
-    price_max = max(min_price_cap + 5, round(base_price * max_offset_mult))
+    price_min = int(max(min_price_cap, round(base_price * min_offset_mult)))
+    price_max = int(max(min_price_cap + 5, round(base_price * max_offset_mult)))
 
     return {
-        "estimated_weight_g": round(est_weight, 1),
-        "estimated_time_mins": round(est_time_mins),
-        "machine": machine.name,
+        "estimated_weight_g": float(round(est_weight, 1)),
+        "estimated_time_mins": int(round(est_time_mins)),
+        "machine": str(machine.name),
         "price_min": price_min,
         "price_max": price_max,
-        "material_cost": round(material_cost, 2)
+        "material_cost": float(round(material_cost, 2))
     }
 
 def calculate_admin_cost(
@@ -230,6 +233,11 @@ def calculate_admin_cost(
     Returns:
         dict: A highly detailed breakdown including material_cost, electricity_cost, direct_cost, wear_tear, labor_cost, prep_cost, subtotal, and final selling_price.
     """
+    weight_g = float(weight_g)
+    print_time_mins = float(print_time_mins)
+    labor_hours = float(labor_hours)
+    prep_hours = float(prep_hours)
+
     # 1. Fetch material info
     if user_id:
         material = db.query(UserMaterial).filter(UserMaterial.user_id == user_id, UserMaterial.material_id == material_id.lower()).first()

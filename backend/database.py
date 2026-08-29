@@ -37,6 +37,18 @@ elif DATABASE_URL.startswith("postgres://"):
 connect_args = {}
 if DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
+else:
+    # Register adapters for numpy data types so psycopg2 never formats them as unquoted identifiers
+    try:
+        import numpy as np
+        import psycopg2.extensions
+        psycopg2.extensions.register_adapter(np.float64, psycopg2.extensions.Float)
+        psycopg2.extensions.register_adapter(np.float32, psycopg2.extensions.Float)
+        psycopg2.extensions.register_adapter(np.int64, psycopg2.extensions.AsIs)
+        psycopg2.extensions.register_adapter(np.int32, psycopg2.extensions.AsIs)
+        psycopg2.extensions.register_adapter(np.bool_, psycopg2.extensions.Boolean)
+    except Exception:
+        pass
 
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
