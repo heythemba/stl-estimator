@@ -691,6 +691,7 @@ def register_developer(req: RegisterRequest, request: Request, db: Session = Dep
     db.add(UserSetting(user_id=new_user.id, key="labor_scanning_rate", value=25.0))
     db.add(UserSetting(user_id=new_user.id, key="tax_percent", value=19.0))
     db.add(UserSetting(user_id=new_user.id, key="support_buffer_percent", value=10.0))
+    db.add(UserSetting(user_id=new_user.id, key="min_price_cap", value=3.0))
     
     # Seed default user materials
     db.add(UserMaterial(user_id=new_user.id, material_id="pla", name="PLA", density_g_cm3=1.24, price_per_kg=60.0))
@@ -943,7 +944,7 @@ def get_developer_settings(
     settings_dict = {s.key: s.value for s in user_settings}
     
     # Check if we need to seed settings for legacy users
-    required_keys = ["electricity_rate", "wear_tear_percent", "margin_percent", "labor_rate_hourly", "support_buffer_percent", "labor_modeling_rate", "labor_scanning_rate", "tax_percent"]
+    required_keys = ["electricity_rate", "wear_tear_percent", "margin_percent", "labor_rate_hourly", "support_buffer_percent", "labor_modeling_rate", "labor_scanning_rate", "tax_percent", "min_price_cap"]
     seeded_any = False
     for k in required_keys:
         if k not in settings_dict:
@@ -958,6 +959,8 @@ def get_developer_settings(
                 val = 25.0
             elif k == "tax_percent":
                 val = 19.0
+            elif k == "min_price_cap":
+                val = 3.0
             new_s = UserSetting(user_id=current_user.id, key=k, value=val)
             db.add(new_s)
             settings_dict[k] = val

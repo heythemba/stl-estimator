@@ -108,7 +108,7 @@ def calculate_public_estimate(db: Session, volume_cm3: float, material_id: str, 
         margin_percent = float(get_user_setting(db, user_id, "margin_percent", 20.0)) / 100.0
         tax_percent = float(get_user_setting(db, user_id, "tax_percent", 19.0)) / 100.0
         support_buffer = float(get_user_setting(db, user_id, "support_buffer_percent", 10.0)) / 100.0
-        min_price_cap = 15.0
+        min_price_cap = float(get_user_setting(db, user_id, "min_price_cap", 3.0))
         min_offset_mult = 0.90
         max_offset_mult = 1.15
     else:
@@ -117,7 +117,7 @@ def calculate_public_estimate(db: Session, volume_cm3: float, material_id: str, 
         margin_percent = float(get_setting(db, "margin_percent", 20.0)) / 100.0
         tax_percent = float(get_setting(db, "tax_percent", 19.0)) / 100.0
         support_buffer = float(get_setting(db, "public_support_buffer_percent", 10.0)) / 100.0
-        min_price_cap = float(get_setting(db, "public_min_price_cap", 15.0))
+        min_price_cap = float(get_setting(db, "public_min_price_cap", 3.0))
         min_offset_mult = float(get_setting(db, "public_price_range_min_offset", 90.0)) / 100.0
         max_offset_mult = float(get_setting(db, "public_price_range_max_offset", 115.0)) / 100.0
     
@@ -262,28 +262,30 @@ def calculate_admin_cost(
 
     # 3. Fetch settings
     if user_id:
-        electricity_rate = get_user_setting(db, user_id, "electricity_rate", 0.0)
-        wear_tear_percent = get_user_setting(db, user_id, "wear_tear_percent", 10.0) / 100.0
-        margin_percent = get_user_setting(db, user_id, "margin_percent", 20.0) / 100.0
-        labor_rate_hourly = get_user_setting(db, user_id, "labor_rate_hourly", 15.0)
-        labor_modeling_rate = get_user_setting(db, user_id, "labor_modeling_rate", 15.0)
-        labor_scanning_rate = get_user_setting(db, user_id, "labor_scanning_rate", 25.0)
-        tax_percent = get_user_setting(db, user_id, "tax_percent", 19.0)
+        electricity_rate = float(get_user_setting(db, user_id, "electricity_rate", 0.0))
+        wear_tear_percent = float(get_user_setting(db, user_id, "wear_tear_percent", 10.0)) / 100.0
+        margin_percent = float(get_user_setting(db, user_id, "margin_percent", 20.0)) / 100.0
+        labor_rate_hourly = float(get_user_setting(db, user_id, "labor_rate_hourly", 15.0))
+        labor_modeling_rate = float(get_user_setting(db, user_id, "labor_modeling_rate", 15.0))
+        labor_scanning_rate = float(get_user_setting(db, user_id, "labor_scanning_rate", 25.0))
+        tax_percent = float(get_user_setting(db, user_id, "tax_percent", 19.0))
+        min_price_cap = float(get_user_setting(db, user_id, "min_price_cap", 3.0))
     else:
-        electricity_rate = get_setting(db, "electricity_rate", 0.0)
-        wear_tear_percent = get_setting(db, "wear_tear_percent", 10.0) / 100.0
-        margin_percent = get_setting(db, "margin_percent", 20.0) / 100.0
-        labor_rate_hourly = get_setting(db, "labor_rate_hourly", 15.0)
-        labor_modeling_rate = get_setting(db, "labor_modeling_rate", 15.0)
-        labor_scanning_rate = get_setting(db, "labor_scanning_rate", 25.0)
-        tax_percent = get_setting(db, "tax_percent", 19.0)
+        electricity_rate = float(get_setting(db, "electricity_rate", 0.0))
+        wear_tear_percent = float(get_setting(db, "wear_tear_percent", 10.0)) / 100.0
+        margin_percent = float(get_setting(db, "margin_percent", 20.0)) / 100.0
+        labor_rate_hourly = float(get_setting(db, "labor_rate_hourly", 15.0))
+        labor_modeling_rate = float(get_setting(db, "labor_modeling_rate", 15.0))
+        labor_scanning_rate = float(get_setting(db, "labor_scanning_rate", 25.0))
+        tax_percent = float(get_setting(db, "tax_percent", 19.0))
+        min_price_cap = float(get_setting(db, "public_min_price_cap", 3.0))
 
     # 4. Perform calculations
-    material_cost = (weight_g / 1000.0) * material.price_per_kg
+    material_cost = (weight_g / 1000.0) * float(material.price_per_kg)
     
     # Calculate electricity cost based on print time and machine power consumption
     print_time_hours = print_time_mins / 60.0
-    machine_power_kw = machine.power_watts / 1000.0
+    machine_power_kw = float(machine.power_watts) / 1000.0
     electricity_cost = machine_power_kw * print_time_hours * electricity_rate
     
     # Base manufacturing cost
@@ -302,9 +304,19 @@ def calculate_admin_cost(
     
     # Final Pricing calculations
     subtotal = direct_cost + wear_tear + labor_cost + prep_cost
-    selling_price_ht = subtotal * (1.0 + margin_percent) + machine.flat_premium
+    selling_price_ht = subtotal * (1.0 + margin_percent) + float(machine.flat_premium)
     tax_amount = selling_price_ht * (tax_percent / 100.0)
     selling_price_ttc = selling_price_ht + tax_amount
+
+    # Apply Minimum Price Cap Floor if configured (e.g. minimum 3 TND)
+    if min_price_cap > 0 and selling_price_ttc < min_price_cap:
+        selling_price_ttc = min_price_cap
+        if tax_percent > 0:
+            selling_price_ht = selling_price_ttc / (1.0 + (tax_percent / 100.0))
+            tax_amount = selling_price_ttc - selling_price_ht
+        else:
+            selling_price_ht = selling_price_ttc
+            tax_amount = 0.0
 
     return {
         "material_cost": round(material_cost, 2),

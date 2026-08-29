@@ -502,6 +502,42 @@ function populateAdminSelects() {
 function setupAdminCalculator() {
     const form = document.getElementById('admin-calc-form');
     if (!form) return;
+
+    let adminTimeUnit = 'min';
+    const timeInput = document.getElementById('admin-time');
+    const unitLabel = document.getElementById('admin-time-unit-label');
+    const unitMinBtn = document.getElementById('admin-time-unit-min');
+    const unitHrsBtn = document.getElementById('admin-time-unit-hrs');
+
+    if (unitMinBtn && unitHrsBtn && timeInput) {
+        unitMinBtn.addEventListener('click', () => {
+            if (adminTimeUnit === 'hrs') {
+                const val = parseFloat(timeInput.value);
+                if (!isNaN(val)) {
+                    timeInput.value = Math.round(val * 60);
+                }
+                adminTimeUnit = 'min';
+                unitMinBtn.classList.add('active');
+                unitHrsBtn.classList.remove('active');
+                if (unitLabel) unitLabel.innerText = 'mins';
+                timeInput.placeholder = 'e.g. 90';
+            }
+        });
+
+        unitHrsBtn.addEventListener('click', () => {
+            if (adminTimeUnit === 'min') {
+                const val = parseFloat(timeInput.value);
+                if (!isNaN(val)) {
+                    timeInput.value = parseFloat((val / 60).toFixed(2));
+                }
+                adminTimeUnit = 'hrs';
+                unitHrsBtn.classList.add('active');
+                unitMinBtn.classList.remove('active');
+                if (unitLabel) unitLabel.innerText = 'hrs';
+                timeInput.placeholder = 'e.g. 1.5';
+            }
+        });
+    }
     
     // Setup Drag-and-Drop / click listener for Admin Cost Calculator STL upload
     const adminStlZone = document.getElementById('admin-stl-zone');
@@ -578,7 +614,11 @@ function setupAdminCalculator() {
             const data = await response.json();
             if (response.ok && data.success) {
                 document.getElementById('admin-weight').value = data.estimated_weight_g.toFixed(1);
-                document.getElementById('admin-time').value = Math.round(data.estimated_time_mins);
+                if (adminTimeUnit === 'hrs') {
+                    document.getElementById('admin-time').value = parseFloat((data.estimated_time_mins / 60.0).toFixed(2));
+                } else {
+                    document.getElementById('admin-time').value = Math.round(data.estimated_time_mins);
+                }
                 if (statusEl) {
                     statusEl.innerText = "Weight & Print Time auto-populated!";
                     statusEl.style.color = "#10b981";
@@ -604,11 +644,14 @@ function setupAdminCalculator() {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         
+        const rawTime = parseFloat(document.getElementById('admin-time').value);
+        const printTimeMins = (adminTimeUnit === 'hrs') ? (rawTime * 60.0) : rawTime;
+
         const payload = {
             material_id: document.getElementById('admin-material').value,
             machine_id: document.getElementById('admin-machine').value,
             weight_g: parseFloat(document.getElementById('admin-weight').value),
-            print_time_mins: parseFloat(document.getElementById('admin-time').value),
+            print_time_mins: printTimeMins,
             labor_hours: parseFloat(document.getElementById('admin-labor').value || 0),
             prep_type: document.getElementById('admin-prep-type').value,
             prep_hours: parseFloat(document.getElementById('admin-prep-hours').value || 0)
@@ -1188,7 +1231,8 @@ async function saveDeveloperSettings() {
         labor_modeling_rate: parseFloat(document.getElementById('cfg-labor-modeling').value),
         labor_scanning_rate: parseFloat(document.getElementById('cfg-labor-scanning').value),
         tax_percent: parseFloat(document.getElementById('cfg-tax-percent').value),
-        support_buffer_percent: parseFloat(document.getElementById('cfg-support').value)
+        support_buffer_percent: parseFloat(document.getElementById('cfg-support').value),
+        min_price_cap: parseFloat(document.getElementById('cfg-min-price-cap') ? document.getElementById('cfg-min-price-cap').value : 3.0)
     };
     
     const matRows = document.querySelectorAll('#settings-materials-tbody tr');
@@ -1317,6 +1361,7 @@ function populateSettingsFields(data) {
     setVal('cfg-tax-percent', cfg.tax_percent, 19.0);
     setVal('cfg-support', cfg.support_buffer_percent, 10.0);
     setVal('cfg-infill', cfg.infill_ratio, 20.0);
+    setVal('cfg-min-price-cap', cfg.min_price_cap, 3.0);
     
     // Populate Materials Table
     const matTbody = document.getElementById('settings-materials-tbody');

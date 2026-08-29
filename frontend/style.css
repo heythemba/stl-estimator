@@ -410,6 +410,41 @@ body {
     pointer-events: none;
 }
 
+/* Time Unit Toggle */
+.time-unit-toggle {
+    display: inline-flex;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 2px;
+    gap: 2px;
+    align-items: center;
+}
+
+.unit-toggle-btn {
+    padding: 2px 9px;
+    font-size: 0.72rem;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    transition: var(--transition-smooth);
+}
+
+.unit-toggle-btn:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.unit-toggle-btn.active {
+    background: var(--primary);
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(99, 102, 241, 0.35);
+}
+
 /* File Upload zone */
 .upload-dropzone {
     border: 2px dashed rgba(255, 255, 255, 0.15);

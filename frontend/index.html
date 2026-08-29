@@ -446,11 +446,17 @@
                                                 </div>
                                             </div>
                                             <div class="form-group flex-1">
-                                                <label class="form-label" for="admin-time">Print Time (minutes)</label>
+                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                                                    <label class="form-label" for="admin-time" style="margin-bottom: 0;">Print Time</label>
+                                                    <div class="time-unit-toggle">
+                                                        <button type="button" class="unit-toggle-btn active" id="admin-time-unit-min">min</button>
+                                                        <button type="button" class="unit-toggle-btn" id="admin-time-unit-hrs">hrs</button>
+                                                    </div>
+                                                </div>
                                                 <div class="input-unit-wrapper">
-                                                    <input type="number" id="admin-time" min="1" step="1"
-                                                        class="form-input" placeholder="e.g. 185" required>
-                                                    <span class="input-unit">mins</span>
+                                                    <input type="number" id="admin-time" min="0.01" step="any"
+                                                        class="form-input" placeholder="e.g. 90" required>
+                                                    <span class="input-unit" id="admin-time-unit-label">mins</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -593,6 +599,16 @@
                                                     <span class="input-unit">%</span>
                                                 </div>
                                             </div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group flex-1">
+                                                <label class="form-label" for="cfg-min-price-cap">Minimum Selling Price Floor (TND)</label>
+                                                <div class="input-unit-wrapper">
+                                                    <input type="number" id="cfg-min-price-cap" step="0.5" min="0" class="form-input" placeholder="e.g. 3.0">
+                                                    <span class="input-unit">TND</span>
+                                                </div>
+                                            </div>
+                                            <div class="form-group flex-1"></div>
                                         </div>
                                         <button type="submit" class="submit-btn save-btn" style="margin-top: 1rem;">
                                             <i class="fa-solid fa-floppy-disk"></i> Save Core Variables
