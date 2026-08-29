@@ -3,6 +3,7 @@ venv/
 .venv/
 env/
 .env
+.neon
 
 # Databases & local logs
 *.db
