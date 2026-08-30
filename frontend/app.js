@@ -7,6 +7,7 @@ let addModalMode = 'dev';
 let globalSettings = {};
 let selectedPublicMaterialId = 'pla';
 let activeStlFile = null;
+let isConfigLoaded = false;
 
 // Three.js Variables
 let scene, camera, renderer, controls, stlMesh;
@@ -124,18 +125,21 @@ function setupNavigation() {
 async function fetchConfig() {
     try {
         const response = await fetch('/api/settings');
-        const data = await response.json();
-        
-        materials = data.materials;
-        machines = data.machines;
-        globalSettings = data.global_settings;
-        
-        renderPublicMaterialSelector();
-        populateAdminSelects();
-        populateSettingsFields(data);
-        checkConfigurationState();
+        if (response.ok) {
+            const data = await response.json();
+            
+            materials = data.materials || [];
+            machines = data.machines || [];
+            globalSettings = data.global_settings || {};
+            
+            renderPublicMaterialSelector();
+            populateAdminSelects();
+            populateSettingsFields(data);
+        }
     } catch (error) {
         console.error('Error fetching system configurations:', error);
+    } finally {
+        isConfigLoaded = true;
         checkConfigurationState();
     }
 }
@@ -2530,6 +2534,9 @@ function deleteSaLocalMachine(id) {
 
 // Configuration State Checks and Warning Modal
 function checkConfigurationState() {
+    // Only check configuration state once initial config fetch from the database has completed
+    if (!isConfigLoaded) return;
+
     const isConfigured = materials && materials.length > 0 && 
                         machines && machines.length > 0 && 
                         globalSettings && Object.keys(globalSettings).length > 0;
