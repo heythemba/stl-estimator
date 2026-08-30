@@ -588,6 +588,7 @@ def update_settings(
         )
 # Resend API configuration
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "no-reply@api.replica.tn")
 
 def send_resend_email(to_email: str, subject: str, html_content: str) -> bool:
     """
@@ -599,7 +600,7 @@ def send_resend_email(to_email: str, subject: str, html_content: str) -> bool:
         "Content-Type": "application/json"
     }
     payload = {
-        "from": "Replica Estimator <onboarding@resend.dev>",
+        "from": RESEND_FROM_EMAIL,
         "to": [to_email],
         "subject": subject,
         "html": html_content

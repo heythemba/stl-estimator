@@ -219,6 +219,7 @@ erDiagram
 | `DATABASE_URL` | `sqlite:///replica_estimator_v4.db` | Database connection string (Postgres/Supabase/SQLite). |
 | `ADMIN_PASSCODE` | `Hey1994Ba25` | Passcode required to unlock Super Admin portal. |
 | `RESEND_API_KEY` | `None` | API key for transactional emails (activation & password reset). |
+| `RESEND_FROM_EMAIL` | `no-reply@api.replica.tn` | Sender address for transactional emails. |
 | `UPLOAD_DIR` | `uploads` (or `/tmp/uploads` on serverless) | Directory for storing uploaded STL files. |
 
 ---
