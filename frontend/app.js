@@ -236,7 +236,7 @@ function handleStlSelection(file) {
                         machines && machines.length > 0 && 
                         globalSettings && Object.keys(globalSettings).length > 0;
     if (!isConfigured) {
-        showToast('The estimator is not configured yet and cannot provide an estimation.', 'warning');
+        showToast('L\'estimateur n\'est pas encore configuré et ne peut pas fournir d\'estimation.', 'warning');
         const configModal = document.getElementById('configure-estimator-modal');
         if (configModal) {
             configModal.classList.remove('hidden');
@@ -245,7 +245,7 @@ function handleStlSelection(file) {
     }
     
     if (!file.name.toLowerCase().endsWith('.stl')) {
-        showToast('Please select a valid STL file.', 'error');
+        showToast('Veuillez sélectionner un fichier STL valide.', 'error');
         return;
     }
     
@@ -260,13 +260,13 @@ function handleStlSelection(file) {
     progressContainer.classList.remove('hidden');
     filenameSpan.innerHTML = `<i class="fa-solid fa-file-invoice"></i> ${file.name}`;
     progressBar.style.width = '20%';
-    statusText.innerText = 'Reading file client-side...';
+    statusText.innerText = 'Lecture du fichier en local...';
     
     // Load and render STL in 3D
     const reader = new FileReader();
     reader.onload = function (e) {
         progressBar.style.width = '40%';
-        statusText.innerText = 'Parsing 3D geometry...';
+        statusText.innerText = 'Analyse de la géométrie 3D...';
         loadStlInViewer(e.target.result);
     };
     reader.readAsArrayBuffer(file);
@@ -280,7 +280,7 @@ function triggerStlScan(file) {
     const statusText = document.getElementById('upload-status-text');
     
     progressBar.style.width = '60%';
-    statusText.innerText = 'Running server mesh scan...';
+    statusText.innerText = 'Scan du maillage sur le serveur...';
     
     const formData = new FormData();
     formData.append('file', file);
@@ -289,7 +289,7 @@ function triggerStlScan(file) {
     xhr.open('POST', '/api/estimate/scan', true);
     
     xhr.onload = function () {
-        let detail = 'Failed to scan file.';
+        let detail = 'Échec de l\'analyse du fichier.';
         let res = null;
         try {
             res = JSON.parse(xhr.responseText);
@@ -300,7 +300,7 @@ function triggerStlScan(file) {
             // Keep progress bar in a "Ready" state — don't hide it
             progressBar.style.width = '100%';
             progressBar.style.background = 'linear-gradient(90deg, var(--success), #34d399)';
-            statusText.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--success)"></i> Ready — click Calculate on the left';
+            statusText.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--success)"></i> Prêt — cliquez sur Calculer à gauche';
             
             // Hide dropzone, keep progress bar visible
             document.getElementById('upload-zone').classList.add('hidden');
@@ -311,8 +311,8 @@ function triggerStlScan(file) {
             document.getElementById('confirm-filename').innerText = file.name;
             document.getElementById('confirm-volume').innerText = res.volume_cm3 + ' cm³';
             document.getElementById('confirm-watertight').innerHTML = res.is_watertight ? 
-                '<span style="color: var(--success);"><i class="fa-solid fa-circle-check"></i> Yes</span>' : 
-                '<span style="color: var(--warning);"><i class="fa-solid fa-triangle-exclamation"></i> No</span>';
+                '<span style="color: var(--success);"><i class="fa-solid fa-circle-check"></i> Oui</span>' : 
+                '<span style="color: var(--warning);"><i class="fa-solid fa-triangle-exclamation"></i> Non</span>';
             
             // Show Calculate button on the left
             const calcBtn = document.getElementById('public-calculate-btn');
@@ -331,15 +331,15 @@ function triggerStlScan(file) {
             resetPublicEstimator();
         } else {
             progressBar.style.backgroundColor = 'var(--error)';
-            statusText.innerText = 'Error: ' + detail;
+            statusText.innerText = 'Erreur : ' + detail;
             showToast(detail, 'error');
         }
     };
     
     xhr.onerror = function () {
         progressBar.style.backgroundColor = 'var(--error)';
-        statusText.innerText = 'Connection error.';
-        showToast('Connection error during upload.', 'error');
+        statusText.innerText = 'Erreur de connexion.';
+        showToast('Erreur de connexion lors de l\'envoi.', 'error');
     };
     
     xhr.send(formData);
@@ -350,7 +350,7 @@ function triggerEstimation(file) {
                         machines && machines.length > 0 && 
                         globalSettings && Object.keys(globalSettings).length > 0;
     if (!isConfigured) {
-        showToast('The estimator is not configured yet and cannot provide an estimation.', 'warning');
+        showToast('L\'estimateur n\'est pas encore configuré et ne peut pas fournir d\'estimation.', 'warning');
         const configModal = document.getElementById('configure-estimator-modal');
         if (configModal) {
             configModal.classList.remove('hidden');
@@ -387,7 +387,7 @@ function triggerEstimation(file) {
         // Hide spinner
         if (calcLoading) { calcLoading.classList.add('hidden'); calcLoading.style.display = 'none'; }
         
-        let detail = 'Failed to estimate';
+        let detail = 'Échec de l\'estimation';
         try { detail = JSON.parse(xhr.responseText).detail || detail; } catch (e) {}
         
         if (xhr.status === 200) {
@@ -416,7 +416,7 @@ function triggerEstimation(file) {
     
     xhr.onerror = function () {
         if (calcLoading) { calcLoading.classList.add('hidden'); calcLoading.style.display = 'none'; }
-        showToast('Connection error during estimation.', 'error');
+        showToast('Erreur de connexion lors de l\'estimation.', 'error');
         if (calcBtn) calcBtn.classList.remove('hidden');
         document.getElementById('public-upload-confirm').classList.remove('hidden');
     };
@@ -434,7 +434,7 @@ function displayPublicResults(res) {
     // Format print time in hours and minutes
     const hours = Math.floor(res.estimated_time_mins / 60);
     const mins = res.estimated_time_mins % 60;
-    const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}mins`;
+    const timeStr = hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
     document.getElementById('est-time').innerText = timeStr;
     
     document.getElementById('est-machine').innerText = res.machine;
@@ -448,7 +448,7 @@ function resetPublicEstimator() {
     const progressBar = document.getElementById('upload-progress-bar');
     if (progressBar) { progressBar.style.width = '0%'; progressBar.style.background = ''; progressBar.style.backgroundColor = ''; }
     document.getElementById('upload-progress-container').classList.add('hidden');
-    document.getElementById('upload-status-text').innerText = 'Scanning volume mesh...';
+    document.getElementById('upload-status-text').innerText = 'Analyse du volume 3D...';
     
     document.getElementById('public-result-card').classList.add('hidden');
     document.getElementById('public-upload-confirm').classList.add('hidden');
@@ -519,8 +519,8 @@ function setupAdminCalculator() {
                 adminTimeUnit = 'min';
                 unitMinBtn.classList.add('active');
                 unitHrsBtn.classList.remove('active');
-                if (unitLabel) unitLabel.innerText = 'mins';
-                timeInput.placeholder = 'e.g. 90';
+                if (unitLabel) unitLabel.innerText = 'min';
+                timeInput.placeholder = 'ex. 90';
             }
         });
 
@@ -533,8 +533,8 @@ function setupAdminCalculator() {
                 adminTimeUnit = 'hrs';
                 unitHrsBtn.classList.add('active');
                 unitMinBtn.classList.remove('active');
-                if (unitLabel) unitLabel.innerText = 'hrs';
-                timeInput.placeholder = 'e.g. 1.5';
+                if (unitLabel) unitLabel.innerText = 'h';
+                timeInput.placeholder = 'ex. 1.5';
             }
         });
     }
@@ -575,21 +575,21 @@ function setupAdminCalculator() {
     
     async function uploadStlForAdminCalc(file) {
         if (!file.name.toLowerCase().endsWith('.stl')) {
-            showToast('Only STL files are supported', 'error');
+            showToast('Seuls les fichiers STL sont supportés', 'error');
             return;
         }
         
         const statusEl = document.getElementById('admin-stl-status');
         if (statusEl) {
-            statusEl.innerText = "Analyzing STL file...";
+            statusEl.innerText = "Analyse du fichier STL en cours...";
             statusEl.style.color = "var(--primary)";
         }
         
         const activeKey = localStorage.getItem('replica_active_dev_key');
         if (!activeKey) {
-            showToast('API Key required for STL analysis', 'error');
+            showToast('Clé API requise pour l\'analyse STL', 'error');
             if (statusEl) {
-                statusEl.innerText = "Will auto-fill Weight and Print Time below";
+                statusEl.innerText = "Remplira automatiquement le poids et le temps ci-dessous";
                 statusEl.style.color = "var(--text-muted)";
             }
             return;
@@ -620,22 +620,22 @@ function setupAdminCalculator() {
                     document.getElementById('admin-time').value = Math.round(data.estimated_time_mins);
                 }
                 if (statusEl) {
-                    statusEl.innerText = "Weight & Print Time auto-populated!";
+                    statusEl.innerText = "Poids et temps d'impression pré-remplis !";
                     statusEl.style.color = "#10b981";
                 }
-                showToast('STL parsed successfully. Weight & Print Time auto-populated.', 'success');
+                showToast('STL analysé avec succès. Poids et temps d\'impression pré-remplis.', 'success');
             } else {
-                showToast('Failed to parse STL: ' + (data.detail || 'unknown error'), 'error');
+                showToast('Échec de l\'analyse STL : ' + (data.detail || 'erreur inconnue'), 'error');
                 if (statusEl) {
-                    statusEl.innerText = "Failed to parse STL file.";
+                    statusEl.innerText = "Échec de l'analyse du fichier STL.";
                     statusEl.style.color = "#ef4444";
                 }
             }
         } catch (error) {
             console.error('Error during developer STL estimate:', error);
-            showToast('Error connecting to the STL estimation API.', 'error');
+            showToast('Erreur de connexion à l\'API d\'estimation STL.', 'error');
             if (statusEl) {
-                statusEl.innerText = "Connection error.";
+                statusEl.innerText = "Erreur de connexion.";
                 statusEl.style.color = "#ef4444";
             }
         }
@@ -659,7 +659,7 @@ function setupAdminCalculator() {
         
         const activeKey = localStorage.getItem('replica_active_dev_key');
         if (!activeKey) {
-            showToast('API Key required for the precise calculator', 'error');
+            showToast('Clé API requise pour le calculateur de devis', 'error');
             return;
         }
         
@@ -677,11 +677,11 @@ function setupAdminCalculator() {
             if (data.success) {
                 renderInvoice(data.breakdown);
             } else {
-                showToast('Calculation failed: ' + data.detail, 'error');
+                showToast('Calcul échoué : ' + data.detail, 'error');
             }
         } catch (error) {
             console.error('Error during precise calculation:', error);
-            showToast('Failed to connect to API service.', 'error');
+            showToast('Impossible de se connecter au service API.', 'error');
         }
     });
 }
@@ -883,7 +883,7 @@ function loadStlInViewer(arrayBuffer) {
             console.error('Error loading STL mesh into Three.js scene:', err);
             document.getElementById('viewer-loading').classList.add('hidden');
             document.getElementById('viewer-placeholder').classList.remove('hidden');
-            alert('Failed to render 3D model preview.');
+            showToast('Impossible d\'afficher la prévisualisation 3D.', 'error');
         }
     }, 100);
 }
@@ -968,15 +968,15 @@ function setupDeveloperPortal() {
                 });
                 const data = await response.json();
                 if (response.ok) {
-                    showToast(data.message || 'Registration successful! Verification email sent.', 'success');
+                    showToast(data.message || 'Inscription réussie ! E-mail de vérification envoyé.', 'success');
                     registerForm.reset();
                     if (loginTabBtn) loginTabBtn.click();
                 } else {
-                    showToast(data.detail || 'Registration failed.', 'error');
+                    showToast(data.detail || 'Échec de l\'inscription.', 'error');
                 }
             } catch (err) {
                 console.error('Error during registration:', err);
-                showToast('Network error during registration.', 'error');
+                showToast('Erreur réseau lors de l\'inscription.', 'error');
             }
         });
     }
@@ -1000,14 +1000,14 @@ function setupDeveloperPortal() {
                     localStorage.setItem('replica_dev_token', data.token);
                     localStorage.setItem('replica_dev_username', data.username);
                     loginForm.reset();
-                    showToast('Logged in successfully!', 'success');
+                    showToast('Connexion réussie !', 'success');
                     showDeveloperDashboard(data.username);
                 } else {
-                    showToast(data.detail || 'Login failed.', 'error');
+                    showToast(data.detail || 'Échec de la connexion.', 'error');
                 }
             } catch (err) {
                 console.error('Error during login:', err);
-                showToast('Network error during login.', 'error');
+                showToast('Erreur réseau lors de la connexion.', 'error');
             }
         });
     }
@@ -1028,14 +1028,14 @@ function setupDeveloperPortal() {
                 });
                 const data = await response.json();
                 if (response.ok) {
-                    showToast(data.message || 'If registered, reset link has been emailed.', 'success');
+                    showToast(data.message || 'Si le compte existe, un lien de réinitialisation a été envoyé par e-mail.', 'success');
                     closeForgotModal();
                 } else {
-                    showToast(data.detail || 'Failed to send reset link.', 'error');
+                    showToast(data.detail || 'Échec de l\'envoi du lien de réinitialisation.', 'error');
                 }
             } catch (err) {
                 console.error('Error during forgot password request:', err);
-                showToast('Network error.', 'error');
+                showToast('Erreur réseau.', 'error');
             }
         });
     }
@@ -1055,7 +1055,7 @@ function setupDeveloperPortal() {
             localStorage.removeItem('replica_dev_token');
             localStorage.removeItem('replica_dev_username');
             localStorage.removeItem('replica_active_dev_key');
-            showToast('Logged out.', 'success');
+            showToast('Déconnexion réussie.', 'success');
             showDeveloperAuth();
         });
     }
@@ -1080,10 +1080,10 @@ function setupDeveloperPortal() {
                 const data = await response.json();
                 if (response.ok) {
                     document.getElementById('dev-key-owner').value = '';
-                    showToast('API Key generated successfully!', 'success');
+                    showToast('Clé API générée avec succès !', 'success');
                     await loadDeveloperKeys();
                 } else {
-                    showToast(data.detail || 'Failed to generate key.', 'error');
+                    showToast(data.detail || 'Échec de la génération de la clé.', 'error');
                 }
             } catch (err) {
                 console.error('Error generating developer key:', err);
@@ -1144,7 +1144,7 @@ function renderDeveloperKeysTable(keys) {
     tbody.innerHTML = '';
     
     if (keys.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No API keys generated yet.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Aucune clé API générée pour le moment.</td></tr>`;
         return;
     }
     
@@ -1153,14 +1153,14 @@ function renderDeveloperKeysTable(keys) {
         row.innerHTML = `
             <td style="font-weight: 700;">${escapeHtml(k.owner)}</td>
             <td>
-                <span class="key-text" onclick="copyToClipboard('${k.key}')" title="Click to copy">
+                <span class="key-text" onclick="copyToClipboard('${k.key}')" title="Cliquer pour copier">
                     <i class="fa-solid fa-copy"></i> <code>${k.key}</code>
                 </span>
             </td>
             <td style="font-weight: 600; text-align: center;">${k.calls_count}</td>
             <td style="text-align: center;">
-                <button class="tbl-btn btn-danger delete-dev-key-btn" data-key="${k.key}" title="Delete Key">
-                    <i class="fa-solid fa-trash"></i> Delete
+                <button class="tbl-btn btn-danger delete-dev-key-btn" data-key="${k.key}" title="Supprimer la clé">
+                    <i class="fa-solid fa-trash"></i> Supprimer
                 </button>
             </td>
         `;
@@ -1170,9 +1170,9 @@ function renderDeveloperKeysTable(keys) {
     tbody.querySelectorAll('.delete-dev-key-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             const key = btn.getAttribute('data-key');
-            if (confirm('Are you sure you want to delete this developer API key?')) {
+            showConfirmModal('Êtes-vous sûr de vouloir supprimer cette clé API développeur ?', async () => {
                 await deleteDeveloperKey(key);
-            }
+            });
         });
     });
 }
@@ -1185,11 +1185,11 @@ async function deleteDeveloperKey(key) {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (response.ok) {
-            showToast('Key deleted.', 'success');
+            showToast('Clé supprimée.', 'success');
             await loadDeveloperKeys();
         } else {
             const err = await response.json();
-            showToast('Failed to delete key: ' + err.detail, 'error');
+            showToast('Échec de la suppression de la clé : ' + err.detail, 'error');
         }
     } catch (e) {
         console.error('Error deleting developer key:', e);
@@ -1286,15 +1286,15 @@ async function saveDeveloperSettings() {
         });
         
         if (response.ok) {
-            showToast('Configurations saved successfully!', 'success');
+            showToast('Paramètres enregistrés avec succès !', 'success');
             await loadDeveloperSettings();
         } else {
             const err = await response.json();
-            showToast('Failed to save settings: ' + err.detail, 'error');
+            showToast('Échec de l\'enregistrement des paramètres : ' + err.detail, 'error');
         }
     } catch (e) {
         console.error('Error saving developer settings:', e);
-        showToast('Network error while saving settings.', 'error');
+        showToast('Erreur réseau lors de l\'enregistrement des paramètres.', 'error');
     }
 }
 
@@ -1319,7 +1319,7 @@ function renderDeveloperUploadsTable(uploads) {
     tbody.innerHTML = '';
     
     if (uploads.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No STL uploads logged using your API keys yet.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Aucun historique de fichier STL pour vos clés API.</td></tr>`;
         return;
     }
     
@@ -1374,7 +1374,7 @@ function populateSettingsFields(data) {
                 <td><input type="number" step="0.01" class="tbl-input mat-density" data-id="${mat.id}" value="${mat.density_g_cm3}"></td>
                 <td><input type="number" step="1" class="tbl-input mat-price" data-id="${mat.id}" value="${mat.price_per_kg}"></td>
                 <td style="text-align: center;">
-                    <button type="button" class="tbl-btn btn-danger delete-material-btn" data-id="${mat.id}" title="Delete Filament" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
+                    <button type="button" class="tbl-btn btn-danger delete-material-btn" data-id="${mat.id}" title="Supprimer le filament" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </td>
@@ -1399,14 +1399,14 @@ function populateSettingsFields(data) {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td style="font-weight: 700;">${escapeHtml(mach.name)}</td>
-                <td><input type="text" class="tbl-input mach-provider" data-id="${mach.id}" value="${escapeHtml(mach.provider || '')}" placeholder="e.g. Bambulab"></td>
+                <td><input type="text" class="tbl-input mach-provider" data-id="${mach.id}" value="${escapeHtml(mach.provider || '')}" placeholder="ex. Bambulab"></td>
                 <td><input type="number" step="10" class="tbl-input mach-power" data-id="${mach.id}" value="${mach.power_watts}"></td>
                 <td><input type="number" step="1" class="tbl-input mach-premium" data-id="${mach.id}" value="${mach.flat_premium}"></td>
                 <td style="text-align: center;">
                     <input type="checkbox" class="mach-enclosed" data-id="${mach.id}" ${mach.enclosed ? 'checked' : ''} style="cursor: pointer; width: auto; transform: scale(1.1);">
                 </td>
                 <td style="text-align: center;">
-                    <button type="button" class="tbl-btn btn-danger delete-machine-btn" data-id="${mach.id}" title="Delete Machine" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
+                    <button type="button" class="tbl-btn btn-danger delete-machine-btn" data-id="${mach.id}" title="Supprimer l'imprimante" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </td>
@@ -1454,15 +1454,15 @@ function setupSuperAdminPortal() {
                 dashboardCard.classList.remove('hidden');
                 errorText.classList.add('hidden');
                 passcodeInput.value = '';
-                showToast('Welcome Super Admin!', 'success');
+                showToast('Bienvenue Super Admin !', 'success');
                 await loadSuperAdminData();
             } else {
-                errorText.innerText = data.detail || 'Unlock failed.';
+                errorText.innerText = data.detail || 'Déverrouillage échoué.';
                 errorText.classList.remove('hidden');
             }
         } catch (err) {
             console.error('Error unlocking admin portal:', err);
-            errorText.innerText = 'Network error.';
+            errorText.innerText = 'Erreur réseau.';
             errorText.classList.remove('hidden');
         }
     };
@@ -1493,7 +1493,7 @@ function setupSuperAdminPortal() {
             sessionStorage.removeItem('replica_admin_token');
             lockScreen.classList.remove('hidden');
             dashboardCard.classList.add('hidden');
-            showToast('Locked Super Admin session.', 'info');
+            showToast('Session administrateur verrouillée.', 'info');
         });
     }
     
@@ -1525,7 +1525,7 @@ function handleAdminUnauthorized() {
     if (lockScreen) lockScreen.classList.remove('hidden');
     if (dashboardCard) dashboardCard.classList.add('hidden');
     
-    showToast('Session expired or unauthorized. Please unlock again.', 'error');
+    showToast('Session expirée ou non autorisée. Veuillez vous reconnecter.', 'error');
 }
 
 async function loadSuperAdminPortal() {
@@ -1692,16 +1692,16 @@ async function saveSuperAdminSettings() {
         }
         
         if (response.ok) {
-            showToast('Platform Configurations saved successfully!', 'success');
+            showToast('Paramètres plateforme enregistrés avec succès !', 'success');
             await loadSuperAdminSettings();
             await fetchConfig(); // Refresh public configs too
         } else {
             const err = await response.json();
-            showToast('Failed to save platform settings: ' + err.detail, 'error');
+            showToast('Échec de l\'enregistrement des paramètres plateforme : ' + err.detail, 'error');
         }
     } catch (e) {
         console.error('Error saving global settings:', e);
-        showToast('Network error while saving.', 'error');
+        showToast('Erreur réseau lors de l\'enregistrement.', 'error');
     }
 }
 
@@ -1729,7 +1729,7 @@ function renderSuperAdminUsersTable(users) {
     tbody.innerHTML = '';
     
     if (users.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No user accounts registered yet.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Aucun compte développeur enregistré.</td></tr>`;
         return;
     }
     
@@ -1746,10 +1746,10 @@ function renderSuperAdminUsersTable(users) {
             <td style="text-align: center; font-weight: 600; color: #a5b4fc;">${u.total_calls}</td>
             <td style="text-align: center;">
                 <button class="tbl-btn sa-reset-btn" data-id="${u.id}" data-username="${u.username}" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; background: var(--secondary); margin-right: 0.3rem;">
-                    <i class="fa-solid fa-key"></i> Reset PW
+                    <i class="fa-solid fa-key"></i> Réinitialiser
                 </button>
                 <button class="tbl-btn btn-danger sa-delete-user-btn" data-id="${u.id}" data-username="${u.username}" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
-                    <i class="fa-solid fa-trash"></i> Delete
+                    <i class="fa-solid fa-trash"></i> Supprimer
                 </button>
             </td>
         `;
@@ -1760,7 +1760,7 @@ function renderSuperAdminUsersTable(users) {
         btn.addEventListener('click', () => {
             const id = btn.getAttribute('data-id');
             const username = btn.getAttribute('data-username');
-            const newPassword = prompt(`Enter new password for user '${username}' (min 6 chars):`);
+            const newPassword = prompt(`Entrez le nouveau mot de passe pour '${username}' (minimum 6 caractères) :`);
             if (newPassword) {
                 resetUserPassword(id, newPassword);
             }
@@ -1771,9 +1771,9 @@ function renderSuperAdminUsersTable(users) {
         btn.addEventListener('click', () => {
             const id = btn.getAttribute('data-id');
             const username = btn.getAttribute('data-username');
-            if (confirm(`Are you sure you want to permanently delete user account '${username}' and all their settings/keys?`)) {
-                deleteUserAccount(id);
-            }
+            showConfirmModal(`Êtes-vous sûr de vouloir supprimer définitivement le compte '${username}' et toutes ses configurations/clés ?`, async () => {
+                await deleteUserAccount(id);
+            });
         });
     });
 }
@@ -1793,10 +1793,10 @@ async function resetUserPassword(userId, newPassword) {
             return;
         }
         if (response.ok) {
-            showToast('Password reset successfully!', 'success');
+            showToast('Mot de passe réinitialisé avec succès !', 'success');
         } else {
             const err = await response.json();
-            showToast('Failed to reset password: ' + err.detail, 'error');
+            showToast('Échec de la réinitialisation : ' + err.detail, 'error');
         }
     } catch (e) {
         console.error('Error resetting password:', e);
@@ -1814,11 +1814,11 @@ async function deleteUserAccount(userId) {
             return;
         }
         if (response.ok) {
-            showToast('User account deleted successfully.', 'success');
+            showToast('Compte utilisateur supprimé avec succès.', 'success');
             await loadSuperAdminUsers();
         } else {
             const err = await response.json();
-            showToast('Failed to delete user: ' + err.detail, 'error');
+            showToast('Échec de la suppression : ' + err.detail, 'error');
         }
     } catch (e) {
         console.error('Error deleting user:', e);
@@ -1849,17 +1849,17 @@ function renderSuperAdminKeysTable(keys) {
     tbody.innerHTML = '';
     
     if (keys.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No global API keys generated yet.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Aucune clé API globale générée.</td></tr>`;
         return;
     }
     
     keys.forEach(k => {
         const row = document.createElement('tr');
-        const activeText = k.is_active ? 'Deactivate' : 'Activate';
+        const activeText = k.is_active ? 'Désactiver' : 'Activer';
         
         row.innerHTML = `
             <td>
-                <span class="key-text" onclick="copyToClipboard('${k.key}')" title="Click to copy">
+                <span class="key-text" onclick="copyToClipboard('${k.key}')" title="Cliquer pour copier">
                     <code>${k.key}</code>
                 </span>
             </td>
@@ -1888,9 +1888,9 @@ function renderSuperAdminKeysTable(keys) {
     tbody.querySelectorAll('.sa-delete-key-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             const key = btn.getAttribute('data-key');
-            if (confirm('Are you sure you want to delete this API key?')) {
+            showConfirmModal('Êtes-vous sûr de vouloir supprimer cette clé API ?', async () => {
                 await deleteSuperAdminKey(key);
-            }
+            });
         });
     });
 }
@@ -1924,11 +1924,11 @@ async function deleteSuperAdminKey(key) {
             return;
         }
         if (response.ok) {
-            showToast('API key deleted successfully.', 'success');
+            showToast('Clé API supprimée avec succès.', 'success');
             await loadSuperAdminKeys();
         } else {
             const err = await response.json();
-            showToast('Failed to delete key: ' + err.detail, 'error');
+            showToast('Échec de la suppression de la clé : ' + err.detail, 'error');
         }
     } catch (e) {
         console.error('Error deleting key:', e);
@@ -1952,11 +1952,11 @@ async function generateSuperAdminKey() {
         }
         if (response.ok) {
             document.getElementById('sa-key-owner').value = '';
-            showToast('Global API key generated successfully!', 'success');
+            showToast('Clé API globale générée avec succès !', 'success');
             await loadSuperAdminKeys();
         } else {
             const err = await response.json();
-            showToast('Failed to generate key: ' + err.detail, 'error');
+            showToast('Échec de la génération de la clé : ' + err.detail, 'error');
         }
     } catch (e) {
         console.error('Error generating key:', e);
@@ -1993,7 +1993,7 @@ function renderSuperAdminUploadsTable(uploads) {
     updateBulkDeleteButtonState();
     
     if (uploads.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No mesh scans uploaded yet.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Aucun fichier STL téléversé pour le moment.</td></tr>`;
         return;
     }
     
@@ -2017,7 +2017,7 @@ function renderSuperAdminUploadsTable(uploads) {
             </td>
             <td style="text-align: center;">
                 <a href="/api/admin/uploads/${u.id}/download?admin_token=${encodeURIComponent(superadminToken)}" class="tbl-btn" style="text-decoration: none;" download>
-                    <i class="fa-solid fa-download"></i> Download
+                    <i class="fa-solid fa-download"></i> Télécharger
                 </a>
             </td>
         `;
@@ -2067,14 +2067,14 @@ async function deleteSelectedUploads(ids) {
         }
         const data = await response.json();
         if (response.ok) {
-            showToast(`Successfully deleted ${data.deleted_count} files!`, 'success');
+            showToast(`${data.deleted_count} fichier(s) supprimé(s) avec succès !`, 'success');
             await loadSuperAdminUploads();
         } else {
-            showToast(data.detail || 'Failed to delete files.', 'error');
+            showToast(data.detail || 'Échec de la suppression des fichiers.', 'error');
         }
     } catch (e) {
         console.error('Error during bulk deletion:', e);
-        showToast('Network error during deletion.', 'error');
+        showToast('Erreur réseau lors de la suppression.', 'error');
     }
 }
 
@@ -2098,7 +2098,7 @@ function setupBulkDelete() {
             const ids = Array.from(selectedCheckboxes).map(cb => parseInt(cb.getAttribute('data-id')));
             if (ids.length === 0) return;
             
-            showConfirmModal(`Are you sure you want to delete the ${ids.length} selected file(s)? This will permanently remove them from both the database and the server disk.`, async () => {
+            showConfirmModal(`Êtes-vous sûr de vouloir supprimer les ${ids.length} fichier(s) sélectionné(s) ? Cela les supprimera définitivement de la base de données et du disque serveur.`, async () => {
                 await deleteSelectedUploads(ids);
             });
         });
@@ -2113,7 +2113,7 @@ function escapeHtml(str) {
 
 window.copyToClipboard = function(text) {
     navigator.clipboard.writeText(text).then(() => {
-        showToast('API Key copied to clipboard!', 'success');
+        showToast('Clé API copiée dans le presse-papier !', 'success');
     }).catch(err => {
         console.error('Failed to copy: ', err);
     });
@@ -2222,42 +2222,42 @@ function handleRateLimit(waitSecs) {
             }
         }, 1000);
     }
-    showToast(`Rate limit reached. Please wait ${waitSecs} seconds before uploading.`, 'error');
+    showToast(`Limite de requêtes atteinte. Veuillez patienter ${waitSecs} secondes avant de téléverser.`, 'error');
 }
 
 // Custom Settings Customization
 function deleteLocalMaterial(id) {
     if (materials.length <= 1) {
-        showToast('You must keep at least one filament.', 'error');
+        showToast('Vous devez conserver au moins un filament.', 'error');
         return;
     }
     const mat = materials.find(m => m.id === id);
     if (!mat) return;
-    if (confirm(`Are you sure you want to delete filament '${mat.name}'?`)) {
+    showConfirmModal(`Êtes-vous sûr de vouloir supprimer le filament '${mat.name}' ?`, () => {
         materials = materials.filter(m => m.id !== id);
         populateSettingsFields({
             global_settings: getLocalGlobalSettings(),
             materials: materials,
             machines: machines
         });
-    }
+    });
 }
 
 function deleteLocalMachine(id) {
     if (machines.length <= 1) {
-        showToast('You must keep at least one machine.', 'error');
+        showToast('Vous devez conserver au moins une imprimante.', 'error');
         return;
     }
     const mach = machines.find(m => m.id === id);
     if (!mach) return;
-    if (confirm(`Are you sure you want to delete machine '${mach.name}'?`)) {
+    showConfirmModal(`Êtes-vous sûr de vouloir supprimer l'imprimante '${mach.name}' ?`, () => {
         machines = machines.filter(m => m.id !== id);
         populateSettingsFields({
             global_settings: getLocalGlobalSettings(),
             materials: materials,
             machines: machines
         });
-    }
+    });
 }
 
 function getLocalGlobalSettings() {
@@ -2270,8 +2270,12 @@ function getLocalGlobalSettings() {
         wear_tear_percent: getVal('cfg-wear-tear'),
         margin_percent: getVal('cfg-margin'),
         labor_rate_hourly: getVal('cfg-labor'),
+        labor_modeling_rate: getVal('cfg-labor-modeling'),
+        labor_scanning_rate: getVal('cfg-labor-scanning'),
+        tax_percent: getVal('cfg-tax-percent'),
         infill_ratio: getVal('cfg-infill'),
-        support_buffer_percent: getVal('cfg-support')
+        support_buffer_percent: getVal('cfg-support'),
+        min_price_cap: getVal('cfg-min-price-cap', 3.0)
     };
 }
 
@@ -2351,7 +2355,7 @@ function setupCustomButtons() {
             
             if (addModalMode === 'dev') {
                 if (materials.some(m => m.id === id)) {
-                    showToast(`Filament '${name}' already exists.`, 'error');
+                    showToast(`Le filament '${name}' existe déjà.`, 'error');
                     return;
                 }
                 materials.push({
@@ -2367,7 +2371,7 @@ function setupCustomButtons() {
                 });
             } else {
                 if (saMaterials.some(m => m.id === id)) {
-                    showToast(`Filament '${name}' already exists.`, 'error');
+                    showToast(`Le filament '${name}' existe déjà.`, 'error');
                     return;
                 }
                 saMaterials.push({
@@ -2380,7 +2384,7 @@ function setupCustomButtons() {
             }
             
             closeFilament();
-            showToast(`Filament '${name}' added. Click Save to persist changes.`, 'warning');
+            showToast(`Filament '${name}' ajouté. Cliquez sur Enregistrer pour valider.`, 'warning');
         });
     }
 
@@ -2402,7 +2406,7 @@ function setupCustomButtons() {
             
             if (addModalMode === 'dev') {
                 if (machines.some(m => m.id === id)) {
-                    showToast(`Machine '${name}' already exists.`, 'error');
+                    showToast(`L'imprimante '${name}' existe déjà.`, 'error');
                     return;
                 }
                 machines.push({
@@ -2420,7 +2424,7 @@ function setupCustomButtons() {
                 });
             } else {
                 if (saMachines.some(m => m.id === id)) {
-                    showToast(`Machine '${name}' already exists.`, 'error');
+                    showToast(`L'imprimante '${name}' existe déjà.`, 'error');
                     return;
                 }
                 saMachines.push({
@@ -2435,7 +2439,7 @@ function setupCustomButtons() {
             }
             
             closeMachine();
-            showToast(`Machine '${name}' added. Click Save to persist changes.`, 'warning');
+            showToast(`Imprimante '${name}' ajoutée. Cliquez sur Enregistrer pour valider.`, 'warning');
         });
     }
 }
@@ -2451,7 +2455,7 @@ function renderSaMaterialsAndMachines(mats, machs) {
                 <td><input type="number" step="0.01" class="tbl-input sa-mat-density" data-id="${mat.id}" value="${mat.density_g_cm3}"></td>
                 <td><input type="number" step="1" class="tbl-input sa-mat-price" data-id="${mat.id}" value="${mat.price_per_kg}"></td>
                 <td style="text-align: center;">
-                    <button type="button" class="tbl-btn btn-danger sa-delete-material-btn" data-id="${mat.id}" title="Delete Filament" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
+                    <button type="button" class="tbl-btn btn-danger sa-delete-material-btn" data-id="${mat.id}" title="Supprimer le filament" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </td>
@@ -2474,14 +2478,14 @@ function renderSaMaterialsAndMachines(mats, machs) {
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td style="font-weight: 700;">${escapeHtml(mach.name)}</td>
-                <td><input type="text" class="tbl-input sa-mach-provider" data-id="${mach.id}" value="${escapeHtml(mach.provider || '')}" placeholder="e.g. Bambulab"></td>
+                <td><input type="text" class="tbl-input sa-mach-provider" data-id="${mach.id}" value="${escapeHtml(mach.provider || '')}" placeholder="ex. Bambulab"></td>
                 <td><input type="number" step="10" class="tbl-input sa-mach-power" data-id="${mach.id}" value="${mach.power_watts}"></td>
                 <td><input type="number" step="1" class="tbl-input sa-mach-premium" data-id="${mach.id}" value="${mach.flat_premium}"></td>
                 <td style="text-align: center;">
                     <input type="checkbox" class="sa-mach-enclosed" data-id="${mach.id}" ${mach.enclosed ? 'checked' : ''} style="cursor: pointer; width: auto; transform: scale(1.1);">
                 </td>
                 <td style="text-align: center;">
-                    <button type="button" class="tbl-btn btn-danger sa-delete-machine-btn" data-id="${mach.id}" title="Delete Machine" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
+                    <button type="button" class="tbl-btn btn-danger sa-delete-machine-btn" data-id="${mach.id}" title="Supprimer l'imprimante" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;">
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </td>
@@ -2500,28 +2504,28 @@ function renderSaMaterialsAndMachines(mats, machs) {
 
 function deleteSaLocalMaterial(id) {
     if (saMaterials.length <= 1) {
-        showToast('You must keep at least one filament.', 'error');
+        showToast('Vous devez conserver au moins un filament.', 'error');
         return;
     }
     const mat = saMaterials.find(m => m.id === id);
     if (!mat) return;
-    if (confirm(`Are you sure you want to delete filament '${mat.name}' globally?`)) {
+    showConfirmModal(`Êtes-vous sûr de vouloir supprimer le filament '${mat.name}' globalement ?`, () => {
         saMaterials = saMaterials.filter(m => m.id !== id);
         renderSaMaterialsAndMachines(saMaterials, saMachines);
-    }
+    });
 }
 
 function deleteSaLocalMachine(id) {
     if (saMachines.length <= 1) {
-        showToast('You must keep at least one machine.', 'error');
+        showToast('Vous devez conserver au moins une imprimante.', 'error');
         return;
     }
     const mach = saMachines.find(m => m.id === id);
     if (!mach) return;
-    if (confirm(`Are you sure you want to delete machine '${mach.name}' globally?`)) {
+    showConfirmModal(`Êtes-vous sûr de vouloir supprimer l'imprimante '${mach.name}' globalement ?`, () => {
         saMachines = saMachines.filter(m => m.id !== id);
         renderSaMaterialsAndMachines(saMaterials, saMachines);
-    }
+    });
 }
 
 // Configuration State Checks and Warning Modal
