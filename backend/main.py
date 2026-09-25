@@ -233,6 +233,16 @@ async def catch_exceptions_middleware(request, call_next):
             pass
         raise e
 
+@app.middleware("http")
+async def add_cache_control_headers(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.endswith((".html", ".js", ".css")) or not path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 # Seed database tables and initial records
 seed_database()
 
@@ -500,7 +510,9 @@ def get_settings(db: Session = Depends(get_db)):
                 "id": m.id,
                 "name": m.name,
                 "power_watts": m.power_watts,
-                "flat_premium": m.flat_premium,
+                "startup_cost": getattr(m, 'startup_cost', None) if getattr(m, 'startup_cost', None) is not None else (getattr(m, 'flat_premium', 0.0) or 0.0),
+                "hourly_rate": getattr(m, 'hourly_rate', 0.0) or 0.0,
+                "flat_premium": getattr(m, 'startup_cost', None) if getattr(m, 'startup_cost', None) is not None else (getattr(m, 'flat_premium', 0.0) or 0.0),
                 "provider": m.provider,
                 "enclosed": m.enclosed
             } for m in machines
@@ -562,10 +574,14 @@ def update_settings(
         for mach_data in request.machines:
             mach_id = mach_data["id"].lower()
             mach = db.query(Machine).filter(Machine.id == mach_id).first()
+            startup_val = float(mach_data.get("startup_cost", mach_data.get("flat_premium", 0.0)) or 0.0)
+            hourly_val = float(mach_data.get("hourly_rate", 0.0) or 0.0)
             if mach:
                 mach.name = mach_data["name"]
                 mach.power_watts = mach_data["power_watts"]
-                mach.flat_premium = mach_data["flat_premium"]
+                mach.startup_cost = startup_val
+                mach.hourly_rate = hourly_val
+                mach.flat_premium = startup_val
                 mach.provider = mach_data.get("provider")
                 mach.enclosed = mach_data.get("enclosed", False)
             else:
@@ -573,7 +589,9 @@ def update_settings(
                     id=mach_id, 
                     name=mach_data["name"], 
                     power_watts=mach_data["power_watts"], 
-                    flat_premium=mach_data["flat_premium"],
+                    startup_cost=startup_val,
+                    hourly_rate=hourly_val,
+                    flat_premium=startup_val,
                     provider=mach_data.get("provider"),
                     enclosed=mach_data.get("enclosed", False)
                 ))
@@ -699,7 +717,7 @@ def register_developer(req: RegisterRequest, request: Request, db: Session = Dep
     db.add(UserMaterial(user_id=new_user.id, material_id="petg", name="PETG", density_g_cm3=1.27, price_per_kg=65.0))
     
     # Seed default user machines
-    db.add(UserMachine(user_id=new_user.id, machine_id="a1_combo", name="A1 Combo", power_watts=150.0, flat_premium=0.0, provider="Bambulab", enclosed=False))
+    db.add(UserMachine(user_id=new_user.id, machine_id="a1_combo", name="A1 Combo", power_watts=150.0, startup_cost=0.0, hourly_rate=0.0, flat_premium=0.0, provider="Bambulab", enclosed=False))
     
     db.commit()
     
@@ -977,7 +995,7 @@ def get_developer_settings(
         
     machines = db.query(UserMachine).filter(UserMachine.user_id == current_user.id).all()
     if not machines:
-        db.add(UserMachine(user_id=current_user.id, machine_id="a1_combo", name="A1 Combo", power_watts=150.0, flat_premium=0.0, provider="Bambulab", enclosed=False))
+        db.add(UserMachine(user_id=current_user.id, machine_id="a1_combo", name="A1 Combo", power_watts=150.0, startup_cost=0.0, hourly_rate=0.0, flat_premium=0.0, provider="Bambulab", enclosed=False))
         seeded_any = True
         machines = db.query(UserMachine).filter(UserMachine.user_id == current_user.id).all()
         
@@ -999,7 +1017,9 @@ def get_developer_settings(
                 "id": m.machine_id,
                 "name": m.name,
                 "power_watts": m.power_watts,
-                "flat_premium": m.flat_premium,
+                "startup_cost": getattr(m, 'startup_cost', None) if getattr(m, 'startup_cost', None) is not None else (getattr(m, 'flat_premium', 0.0) or 0.0),
+                "hourly_rate": getattr(m, 'hourly_rate', 0.0) or 0.0,
+                "flat_premium": getattr(m, 'startup_cost', None) if getattr(m, 'startup_cost', None) is not None else (getattr(m, 'flat_premium', 0.0) or 0.0),
                 "provider": m.provider,
                 "enclosed": m.enclosed
             } for m in machines
@@ -1064,9 +1084,13 @@ def save_developer_settings(
             UserMachine.user_id == current_user.id,
             UserMachine.machine_id == mach_id
         ).first()
+        startup_val = float(mach.get("startup_cost", mach.get("flat_premium", 0.0)) or 0.0)
+        hourly_val = float(mach.get("hourly_rate", 0.0) or 0.0)
         if machine:
             machine.power_watts = mach["power_watts"]
-            machine.flat_premium = mach["flat_premium"]
+            machine.startup_cost = startup_val
+            machine.hourly_rate = hourly_val
+            machine.flat_premium = startup_val
             machine.name = mach.get("name", machine.name)
             machine.provider = mach.get("provider")
             machine.enclosed = mach.get("enclosed", False)
@@ -1076,7 +1100,9 @@ def save_developer_settings(
                 machine_id=mach_id,
                 name=mach.get("name", mach_id.upper()),
                 power_watts=mach["power_watts"],
-                flat_premium=mach["flat_premium"],
+                startup_cost=startup_val,
+                hourly_rate=hourly_val,
+                flat_premium=startup_val,
                 provider=mach.get("provider"),
                 enclosed=mach.get("enclosed", False)
             ))

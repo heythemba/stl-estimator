@@ -48,9 +48,9 @@ stl-estimator/
 
 ### Task 1: Change Pricing Formula or Math
 - **Public Min/Max Range Calculation**: [`backend/estimator.py`](file:///c:/Users/MSI/Documents/stl-estimator/backend/estimator.py) -> `calculate_public_estimate()`
-  - Modifies: Material cost, machine power wattage, electricity rate, wear & tear, margin %, tax %, support buffer %, and min/max offset multipliers.
+  - Modifies: Material cost, machine power wattage, electricity rate, machine cost (startup_cost + hourly_rate * time), wear & tear, margin %, tax %, support buffer %, and min/max offset multipliers.
 - **Precise Slicer / Admin Cost Calculation**: [`backend/estimator.py`](file:///c:/Users/MSI/Documents/stl-estimator/backend/estimator.py) -> `calculate_admin_cost()`
-  - Modifies: Direct material/power costs, wear & tear, labor setup costs, 3D CAD modeling or 3D scanning preparation rates, subtotal, and tax amount.
+  - Modifies: Direct material/power costs, machine operational cost (startup_cost + hourly_rate * time), wear & tear, labor setup costs, 3D CAD modeling or 3D scanning preparation rates, subtotal, and tax amount. Margin is pure profit.
 
 ### Task 2: Change 3D Mesh Parsing or Support New 3D Formats
 - **Mesh Parsing & Volume Extraction**: [`backend/estimator.py`](file:///c:/Users/MSI/Documents/stl-estimator/backend/estimator.py) -> `parse_stl_volume()`
@@ -193,6 +193,8 @@ erDiagram
         string id PK
         string name
         float power_watts
+        float startup_cost
+        float hourly_rate
         float flat_premium
         string provider
         boolean enclosed

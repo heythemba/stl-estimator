@@ -371,6 +371,12 @@ body {
     background: rgba(0, 0, 0, 0.5);
 }
 
+select.form-input option,
+.config-table select.tbl-input option {
+    background-color: #1e1e2f;
+    color: #ffffff;
+}
+
 .form-row {
     display: flex;
     gap: 1.2rem;
@@ -777,6 +783,18 @@ body {
     box-shadow: none;
     cursor: not-allowed;
     transform: none;
+}
+
+.submit-btn.loading {
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    opacity: 0.85;
+    cursor: wait;
+    pointer-events: none;
+    box-shadow: 0 4px 15px var(--primary-glow);
+}
+
+.submit-btn.loading i {
+    animation: fa-spin 1s infinite linear;
 }
 
 /* Admin Placeholder & Invoice */

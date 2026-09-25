@@ -119,7 +119,9 @@ class Machine(Base):
     id = Column(String, primary_key=True, index=True) # e.g., 'a1_combo'
     name = Column(String, nullable=False)            # e.g., 'A1 Combo'
     power_watts = Column(Float, nullable=False)      # e.g., 150.0
-    flat_premium = Column(Float, nullable=False)     # e.g., 0.0 (TND)
+    startup_cost = Column(Float, default=0.0, nullable=True) # Frais de démarrage (TND) flat cost per print job
+    hourly_rate = Column(Float, default=0.0, nullable=True)  # Taux horaire machine (TND/h)
+    flat_premium = Column(Float, default=0.0, nullable=True) # Kept for backward compatibility
     provider = Column(String, nullable=True)         # e.g., 'Bambulab'
     enclosed = Column(Boolean, default=False, nullable=False)
 
@@ -159,7 +161,9 @@ class UserMachine(Base):
     machine_id = Column(String, nullable=False)
     name = Column(String, nullable=False)
     power_watts = Column(Float, nullable=False)
-    flat_premium = Column(Float, nullable=False)
+    startup_cost = Column(Float, default=0.0, nullable=True) # Frais de démarrage (TND) flat cost per print job
+    hourly_rate = Column(Float, default=0.0, nullable=True)  # Taux horaire machine (TND/h)
+    flat_premium = Column(Float, default=0.0, nullable=True) # Kept for backward compatibility
     provider = Column(String, nullable=True)         # e.g., 'Bambulab'
     enclosed = Column(Boolean, default=False, nullable=False)
 
@@ -222,6 +226,20 @@ def seed_database():
                     db.commit()
                 except Exception:
                     db.rollback()
+            if "startup_cost" not in columns:
+                print("Migration: adding 'startup_cost' column to 'machines' table.")
+                db.execute(text("ALTER TABLE machines ADD COLUMN startup_cost FLOAT DEFAULT 0.0"))
+                db.commit()
+                if "flat_premium" in columns:
+                    try:
+                        db.execute(text("UPDATE machines SET startup_cost = COALESCE(flat_premium, 0.0)"))
+                        db.commit()
+                    except Exception:
+                        db.rollback()
+            if "hourly_rate" not in columns:
+                print("Migration: adding 'hourly_rate' column to 'machines' table.")
+                db.execute(text("ALTER TABLE machines ADD COLUMN hourly_rate FLOAT DEFAULT 0.0"))
+                db.commit()
 
         if "user_machines" in inspector.get_table_names():
             columns = [c["name"] for c in inspector.get_columns("user_machines")]
@@ -238,6 +256,20 @@ def seed_database():
                     db.rollback()
                     db.execute(text("ALTER TABLE user_machines ADD COLUMN enclosed BOOLEAN DEFAULT 0"))
                     db.commit()
+            if "startup_cost" not in columns:
+                print("Migration: adding 'startup_cost' column to 'user_machines' table.")
+                db.execute(text("ALTER TABLE user_machines ADD COLUMN startup_cost FLOAT DEFAULT 0.0"))
+                db.commit()
+                if "flat_premium" in columns:
+                    try:
+                        db.execute(text("UPDATE user_machines SET startup_cost = COALESCE(flat_premium, 0.0)"))
+                        db.commit()
+                    except Exception:
+                        db.rollback()
+            if "hourly_rate" not in columns:
+                print("Migration: adding 'hourly_rate' column to 'user_machines' table.")
+                db.execute(text("ALTER TABLE user_machines ADD COLUMN hourly_rate FLOAT DEFAULT 0.0"))
+                db.commit()
     except Exception as migration_error:
         print(f"Migration warning: {migration_error}")
         db.rollback()

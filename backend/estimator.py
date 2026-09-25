@@ -148,7 +148,7 @@ def calculate_public_estimate(db: Session, volume_cm3: float, material_id: str, 
         machine = db.query(Machine).first()
         
     if not machine:
-        machine = Machine(id="a1_combo", name="Default Machine", power_watts=200.0, flat_premium=0.0, enclosed=False)
+        machine = Machine(id="a1_combo", name="Default Machine", power_watts=200.0, startup_cost=0.0, hourly_rate=0.0, flat_premium=0.0, enclosed=False)
         
     machine_id = machine.machine_id if hasattr(machine, 'machine_id') else machine.id
 
@@ -180,9 +180,15 @@ def calculate_public_estimate(db: Session, volume_cm3: float, material_id: str, 
     
     direct_cost = float(material_cost + electricity_cost)
     wear_tear = float(direct_cost * wear_tear_percent)
-    subtotal = float(direct_cost + wear_tear)
     
-    selling_price_ht = float(subtotal * (1.0 + margin_percent) + float(machine.flat_premium))
+    # Machine startup and hourly rate (no printer name hardcoded)
+    startup_cost = float(getattr(machine, 'startup_cost', None) if getattr(machine, 'startup_cost', None) is not None else (getattr(machine, 'flat_premium', 0.0) or 0.0))
+    hourly_rate = float(getattr(machine, 'hourly_rate', 0.0) or 0.0)
+    machine_cost = float(startup_cost + (hourly_rate * print_time_hours))
+
+    subtotal = float(direct_cost + wear_tear + machine_cost)
+    
+    selling_price_ht = float(subtotal * (1.0 + margin_percent))
     tax_amount = float(selling_price_ht * tax_percent)
     base_price = float(selling_price_ht + tax_amount)
     
@@ -288,6 +294,11 @@ def calculate_admin_cost(
     machine_power_kw = float(machine.power_watts) / 1000.0
     electricity_cost = machine_power_kw * print_time_hours * electricity_rate
     
+    # Machine startup and hourly rate (no printer name hardcoded)
+    startup_cost = float(getattr(machine, 'startup_cost', None) if getattr(machine, 'startup_cost', None) is not None else (getattr(machine, 'flat_premium', 0.0) or 0.0))
+    hourly_rate = float(getattr(machine, 'hourly_rate', 0.0) or 0.0)
+    machine_cost = startup_cost + (hourly_rate * print_time_hours)
+
     # Base manufacturing cost
     direct_cost = material_cost + electricity_cost
     
@@ -303,8 +314,8 @@ def calculate_admin_cost(
         prep_cost = prep_hours * labor_scanning_rate
     
     # Final Pricing calculations
-    subtotal = direct_cost + wear_tear + labor_cost + prep_cost
-    selling_price_ht = subtotal * (1.0 + margin_percent) + float(machine.flat_premium)
+    subtotal = direct_cost + wear_tear + machine_cost + labor_cost + prep_cost
+    selling_price_ht = subtotal * (1.0 + margin_percent)
     tax_amount = selling_price_ht * (tax_percent / 100.0)
     selling_price_ttc = selling_price_ht + tax_amount
 
@@ -322,6 +333,9 @@ def calculate_admin_cost(
         "material_cost": round(material_cost, 2),
         "electricity_cost": round(electricity_cost, 2),
         "direct_cost": round(direct_cost, 2),
+        "machine_cost": round(machine_cost, 2),
+        "startup_cost": round(startup_cost, 2),
+        "hourly_machine_cost": round(hourly_rate * print_time_hours, 2),
         "wear_tear": round(wear_tear, 2),
         "labor_cost": round(labor_cost, 2),
         "prep_cost": round(prep_cost, 2),

@@ -4,6 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Devis Instantané Impression 3D | Replica Mahdia, Tunisie</title>
     <link rel="icon" type="image/x-icon" href="icon/Logo replica.ico">
 
@@ -320,7 +323,11 @@
                                 <input type="password" id="login-password" class="form-input" required
                                     placeholder="••••••••">
                             </div>
-                            <button type="submit" class="submit-btn" style="margin-top: 1rem; width: 100%;">
+                            <div class="form-group checkbox-group" style="display: flex; align-items: center; gap: 0.55rem; margin-top: -0.2rem; margin-bottom: 0.6rem;">
+                                <input type="checkbox" id="login-remember-me" style="accent-color: var(--primary); width: 17px; height: 17px; cursor: pointer;">
+                                <label for="login-remember-me" style="font-size: 0.88rem; color: var(--text-muted); cursor: pointer; user-select: none; margin-bottom: 0;">Se souvenir de moi</label>
+                            </div>
+                            <button type="submit" class="submit-btn" style="margin-top: 0.5rem; width: 100%;">
                                 <i class="fa-solid fa-right-to-bracket"></i> Se connecter
                             </button>
                             <div style="text-align: center; margin-top: 0.8rem;">
@@ -507,24 +514,25 @@
                                             <div class="form-group flex-1">
                                                 <div
                                                     style="display: flex; justify-content: space-between; align-items: center; height: 26px;">
-                                                    <label class="form-label" for="admin-time"
+                                                    <label class="form-label"
                                                         style="margin-bottom: 0;">Temps d'impression</label>
-                                                    <div class="time-unit-toggle">
-                                                        <button type="button" class="unit-toggle-btn active"
-                                                            id="admin-time-unit-min">min</button>
-                                                        <button type="button" class="unit-toggle-btn"
-                                                            id="admin-time-unit-hrs">h</button>
-                                                    </div>
                                                 </div>
-                                                <div class="input-unit-wrapper">
-                                                    <input type="number" id="admin-time" min="0.01" step="any"
-                                                        class="form-input" placeholder="ex. 90" required>
-                                                    <span class="input-unit" id="admin-time-unit-label">mins</span>
+                                                <div style="display: flex; gap: 0.5rem;">
+                                                    <div class="input-unit-wrapper" style="flex: 1;">
+                                                        <input type="number" id="admin-time-hours" min="0" step="1"
+                                                            class="form-input" placeholder="0" value="0">
+                                                        <span class="input-unit">h</span>
+                                                    </div>
+                                                    <div class="input-unit-wrapper" style="flex: 1;">
+                                                        <input type="number" id="admin-time-mins" min="0" step="1"
+                                                            class="form-input" placeholder="0" value="0" required>
+                                                        <span class="input-unit">min</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <button type="submit" class="submit-btn" style="margin-top: 1rem;">
+                                        <button type="submit" id="admin-calc-submit-btn" class="submit-btn" style="margin-top: 1rem;">
                                             <i class="fa-solid fa-wand-magic-sparkles"></i> Générer le devis détaillé
                                         </button>
                                     </form>
@@ -556,6 +564,10 @@
                                                 <div class="invoice-item highlight">
                                                     <span>Sous-total coûts directs</span>
                                                     <span class="val" id="inv-direct-cost">0.00 TND</span>
+                                                </div>
+                                                <div class="invoice-item">
+                                                    <span>Coût machine (démarrage + temps)</span>
+                                                    <span class="val" id="inv-machine-cost">0.00 TND</span>
                                                 </div>
                                                 <div class="invoice-item">
                                                     <span>Amortissement &amp; Usure machine</span>
@@ -747,7 +759,8 @@
                                                         <th>Imprimante</th>
                                                         <th>Fabricant</th>
                                                         <th>Puissance (Watts)</th>
-                                                        <th>Prime par impression (TND)</th>
+                                                        <th>Frais de démarrage (TND)</th>
+                                                        <th>Taux horaire (TND/h)</th>
                                                         <th style="width: 100px; text-align: center;">Enceinte fermée</th>
                                                         <th style="width: 80px; text-align: center;">Action</th>
                                                     </tr>
@@ -1052,7 +1065,8 @@
                                                         <th>Modèle d'imprimante</th>
                                                         <th>Fabricant</th>
                                                         <th>Consommation (W)</th>
-                                                        <th>Prime par impression (TND)</th>
+                                                        <th>Frais de démarrage (TND)</th>
+                                                        <th>Taux horaire (TND/h)</th>
                                                         <th style="width: 100px; text-align: center;">Enceinte fermée</th>
                                                         <th style="width: 80px; text-align: center;">Action</th>
                                                     </tr>
@@ -1316,10 +1330,33 @@
                     <input type="text" id="new-machine-name" class="form-input" placeholder="ex. Bambu Lab X1C"
                         required>
                 </div>
-                <div class="form-group" style="margin-bottom: 1.5rem;">
+                <div class="form-group" style="margin-bottom: 1rem;">
                     <label class="form-label" for="new-machine-provider">Fabricant / Marque</label>
-                    <input type="text" id="new-machine-provider" class="form-input" placeholder="ex. Bambulab"
-                        required>
+                    <select id="new-machine-provider" class="form-input" required>
+                        <option value="" disabled selected>Sélectionnez un fabricant</option>
+                        <option value="Bambu Lab">Bambu Lab</option>
+                        <option value="Prusa">Prusa</option>
+                        <option value="Creality">Creality</option>
+                        <option value="Elegoo">Elegoo</option>
+                        <option value="Anycubic">Anycubic</option>
+                        <option value="Sovol">Sovol</option>
+                        <option value="Artillery">Artillery</option>
+                        <option value="Snapmaker">Snapmaker</option>
+                    </select>
+                </div>
+                <div class="grid-2col" style="gap: 0.8rem; margin-bottom: 1rem;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="new-machine-power">Puissance (Watts)</label>
+                        <input type="number" id="new-machine-power" class="form-input" placeholder="200" value="200" step="10" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="new-machine-startup">Frais démarrage (TND)</label>
+                        <input type="number" id="new-machine-startup" class="form-input" placeholder="0.0" value="0.0" step="0.5" required>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom: 1.2rem;">
+                    <label class="form-label" for="new-machine-hourly">Taux horaire machine (TND/h)</label>
+                    <input type="number" id="new-machine-hourly" class="form-input" placeholder="0.0" value="0.0" step="0.5" required>
                 </div>
                 <div class="form-group" style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.6rem;">
                     <input type="checkbox" id="new-machine-enclosed" style="width: auto; margin: 0; cursor: pointer;">

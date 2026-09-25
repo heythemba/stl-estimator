@@ -20,6 +20,7 @@ const tabContents = document.querySelectorAll('.tab-content');
 // Initialize App
 document.addEventListener('DOMContentLoaded', () => {
     setupNavigation();
+    setupFreshnessListeners();
     fetchConfig();
     setupPublicEstimator();
     setupAdminCalculator();
@@ -118,6 +119,56 @@ function setupNavigation() {
     const antiFlickerStyle = document.getElementById('tab-flicker-prevention');
     if (antiFlickerStyle) {
         antiFlickerStyle.remove();
+    }
+}
+
+// 1.1 Page Freshness & Anti-Stale Cache Management
+function setupFreshnessListeners() {
+    // If restored from browser bfcache (Back/Forward cache), force fresh reload
+    window.addEventListener('pageshow', (event) => {
+        if (event.persisted) {
+            window.location.reload();
+        }
+    });
+
+    let lastPageLeaveTime = null;
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            lastPageLeaveTime = Date.now();
+        } else {
+            handlePageReturn();
+        }
+    });
+
+    window.addEventListener('focus', () => {
+        handlePageReturn();
+    });
+
+    async function handlePageReturn() {
+        if (!lastPageLeaveTime) return;
+        const elapsed = Date.now() - lastPageLeaveTime;
+        lastPageLeaveTime = null;
+
+        // If user left browser/tab for more than 15 seconds:
+        if (elapsed > 15000) {
+            // If they are not actively analyzing an STL file, reload to get latest code & state
+            if (!activeStlFile) {
+                window.location.reload();
+                return;
+            }
+        }
+
+        // Silent live configuration sync
+        try {
+            await fetchConfig();
+            const devToken = getDevToken();
+            if (devToken) {
+                await loadDeveloperSettings();
+            }
+        } catch (e) {
+            console.warn('Silent config sync on page return:', e);
+        }
     }
 }
 
@@ -507,43 +558,7 @@ function setupAdminCalculator() {
     const form = document.getElementById('admin-calc-form');
     if (!form) return;
 
-    let adminTimeUnit = 'min';
-    const timeInput = document.getElementById('admin-time');
-    const unitLabel = document.getElementById('admin-time-unit-label');
-    const unitMinBtn = document.getElementById('admin-time-unit-min');
-    const unitHrsBtn = document.getElementById('admin-time-unit-hrs');
-
-    if (unitMinBtn && unitHrsBtn && timeInput) {
-        unitMinBtn.addEventListener('click', () => {
-            if (adminTimeUnit === 'hrs') {
-                const val = parseFloat(timeInput.value);
-                if (!isNaN(val)) {
-                    timeInput.value = Math.round(val * 60);
-                }
-                adminTimeUnit = 'min';
-                unitMinBtn.classList.add('active');
-                unitHrsBtn.classList.remove('active');
-                if (unitLabel) unitLabel.innerText = 'min';
-                timeInput.placeholder = 'ex. 90';
-            }
-        });
-
-        unitHrsBtn.addEventListener('click', () => {
-            if (adminTimeUnit === 'min') {
-                const val = parseFloat(timeInput.value);
-                if (!isNaN(val)) {
-                    timeInput.value = parseFloat((val / 60).toFixed(2));
-                }
-                adminTimeUnit = 'hrs';
-                unitHrsBtn.classList.add('active');
-                unitMinBtn.classList.remove('active');
-                if (unitLabel) unitLabel.innerText = 'h';
-                timeInput.placeholder = 'ex. 1.5';
-            }
-        });
-    }
-    
-    // Setup Drag-and-Drop / click listener for Admin Cost Calculator STL upload
+    // Time input now uses separate hours and minutes fields (no toggle needed)
     const adminStlZone = document.getElementById('admin-stl-zone');
     const adminStlInput = document.getElementById('admin-stl-input');
     
@@ -618,11 +633,13 @@ function setupAdminCalculator() {
             const data = await response.json();
             if (response.ok && data.success) {
                 document.getElementById('admin-weight').value = data.estimated_weight_g.toFixed(1);
-                if (adminTimeUnit === 'hrs') {
-                    document.getElementById('admin-time').value = parseFloat((data.estimated_time_mins / 60.0).toFixed(2));
-                } else {
-                    document.getElementById('admin-time').value = Math.round(data.estimated_time_mins);
-                }
+                const totalMins = Math.round(data.estimated_time_mins || 0);
+                const hours = Math.floor(totalMins / 60);
+                const mins = totalMins % 60;
+                const hoursInput = document.getElementById('admin-time-hours');
+                const minsInput = document.getElementById('admin-time-mins');
+                if (hoursInput) hoursInput.value = hours;
+                if (minsInput) minsInput.value = mins;
                 if (statusEl) {
                     statusEl.innerText = "Poids et temps d'impression pré-remplis !";
                     statusEl.style.color = "#10b981";
@@ -648,8 +665,17 @@ function setupAdminCalculator() {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        const rawTime = parseFloat(document.getElementById('admin-time').value);
-        const printTimeMins = (adminTimeUnit === 'hrs') ? (rawTime * 60.0) : rawTime;
+        const submitBtn = document.getElementById('admin-calc-submit-btn') || form.querySelector('button[type="submit"]');
+        const originalBtnContent = submitBtn ? submitBtn.innerHTML : '';
+        
+        const hoursVal = parseFloat(document.getElementById('admin-time-hours')?.value || 0);
+        const minsVal = parseFloat(document.getElementById('admin-time-mins')?.value || 0);
+        const printTimeMins = (hoursVal * 60.0) + minsVal;
+
+        if (printTimeMins <= 0) {
+            showToast("Veuillez renseigner un temps d'impression valide (supérieur à 0).", 'error');
+            return;
+        }
 
         const payload = {
             material_id: document.getElementById('admin-material').value,
@@ -666,6 +692,12 @@ function setupAdminCalculator() {
             showToast('Clé API requise pour le calculateur de devis', 'error');
             return;
         }
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.classList.add('loading');
+            submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Calcul en cours...';
+        }
         
         try {
             const response = await fetch('/api/estimate/admin', {
@@ -680,12 +712,19 @@ function setupAdminCalculator() {
             
             if (data.success) {
                 renderInvoice(data.breakdown);
+                showToast('Nouveau prix calculé !', 'success');
             } else {
                 showToast('Calcul échoué : ' + data.detail, 'error');
             }
         } catch (error) {
             console.error('Error during precise calculation:', error);
             showToast('Impossible de se connecter au service API.', 'error');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('loading');
+                submitBtn.innerHTML = originalBtnContent;
+            }
         }
     });
 }
@@ -697,6 +736,9 @@ function renderInvoice(bd) {
     document.getElementById('inv-mat-cost').innerText = `${bd.material_cost.toFixed(2)} TND`;
     document.getElementById('inv-elec-cost').innerText = `${bd.electricity_cost.toFixed(2)} TND`;
     document.getElementById('inv-direct-cost').innerText = `${bd.direct_cost.toFixed(2)} TND`;
+    if (document.getElementById('inv-machine-cost')) {
+        document.getElementById('inv-machine-cost').innerText = `${(bd.machine_cost !== undefined ? bd.machine_cost : 0).toFixed(2)} TND`;
+    }
     document.getElementById('inv-wear-cost').innerText = `${bd.wear_tear.toFixed(2)} TND`;
     document.getElementById('inv-labor-cost').innerText = `${bd.labor_cost.toFixed(2)} TND`;
     if (document.getElementById('inv-prep-cost')) {
@@ -892,6 +934,37 @@ function loadStlInViewer(arrayBuffer) {
     }, 100);
 }
 
+// Developer Auth Helpers (Remember Me Support)
+function getDevToken() {
+    return localStorage.getItem('replica_dev_token') || sessionStorage.getItem('replica_dev_token');
+}
+
+function getDevUsername() {
+    return localStorage.getItem('replica_dev_username') || sessionStorage.getItem('replica_dev_username');
+}
+
+function setDevAuth(token, username, remember) {
+    if (remember) {
+        localStorage.setItem('replica_dev_token', token);
+        localStorage.setItem('replica_dev_username', username);
+        sessionStorage.removeItem('replica_dev_token');
+        sessionStorage.removeItem('replica_dev_username');
+    } else {
+        sessionStorage.setItem('replica_dev_token', token);
+        sessionStorage.setItem('replica_dev_username', username);
+        localStorage.removeItem('replica_dev_token');
+        localStorage.removeItem('replica_dev_username');
+    }
+}
+
+function clearDevAuth() {
+    localStorage.removeItem('replica_dev_token');
+    localStorage.removeItem('replica_dev_username');
+    localStorage.removeItem('replica_active_dev_key');
+    sessionStorage.removeItem('replica_dev_token');
+    sessionStorage.removeItem('replica_dev_username');
+}
+
 /// 7. Developer Portal (Multi-tenant Dashboard & Auth)
 function setupDeveloperPortal() {
     const loginForm = document.getElementById('developer-login-form');
@@ -907,6 +980,15 @@ function setupDeveloperPortal() {
     const forgotModal = document.getElementById('forgot-password-modal');
     const forgotModalClose = document.getElementById('forgot-modal-close');
     const forgotModalCancel = document.getElementById('forgot-modal-cancel');
+
+    // Restore remembered login identity if previously saved
+    const rememberedId = localStorage.getItem('replica_remember_identity');
+    const idInput = document.getElementById('login-identity');
+    const remCheckbox = document.getElementById('login-remember-me');
+    if (rememberedId && idInput) {
+        idInput.value = rememberedId;
+        if (remCheckbox) remCheckbox.checked = true;
+    }
     
     // Auth Tab switching
     if (loginTabBtn && registerTabBtn) {
@@ -989,9 +1071,13 @@ function setupDeveloperPortal() {
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const identityVal = document.getElementById('login-identity').value.trim();
+            const passwordVal = document.getElementById('login-password').value;
+            const rememberMe = document.getElementById('login-remember-me')?.checked;
+
             const payload = {
-                identity: document.getElementById('login-identity').value,
-                password: document.getElementById('login-password').value
+                identity: identityVal,
+                password: passwordVal
             };
             try {
                 const response = await fetch('/api/auth/login', {
@@ -1001,9 +1087,19 @@ function setupDeveloperPortal() {
                 });
                 const data = await response.json();
                 if (response.ok) {
-                    localStorage.setItem('replica_dev_token', data.token);
-                    localStorage.setItem('replica_dev_username', data.username);
+                    setDevAuth(data.token, data.username, rememberMe);
+                    if (rememberMe) {
+                        localStorage.setItem('replica_remember_identity', identityVal);
+                    } else {
+                        localStorage.removeItem('replica_remember_identity');
+                    }
                     loginForm.reset();
+                    if (rememberMe) {
+                        const curIdInput = document.getElementById('login-identity');
+                        const curRemCb = document.getElementById('login-remember-me');
+                        if (curIdInput) curIdInput.value = identityVal;
+                        if (curRemCb) curRemCb.checked = true;
+                    }
                     showToast('Connexion réussie !', 'success');
                     showDeveloperDashboard(data.username);
                 } else {
@@ -1047,7 +1143,7 @@ function setupDeveloperPortal() {
     // Logout click
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
-            const token = localStorage.getItem('replica_dev_token');
+            const token = getDevToken();
             try {
                 await fetch('/api/auth/logout', {
                     method: 'POST',
@@ -1056,9 +1152,7 @@ function setupDeveloperPortal() {
             } catch (err) {
                 console.error('Logout request failed:', err);
             }
-            localStorage.removeItem('replica_dev_token');
-            localStorage.removeItem('replica_dev_username');
-            localStorage.removeItem('replica_active_dev_key');
+            clearDevAuth();
             showToast('Déconnexion réussie.', 'success');
             showDeveloperAuth();
         });
@@ -1068,7 +1162,7 @@ function setupDeveloperPortal() {
     if (generateDevKeyForm) {
         generateDevKeyForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const token = localStorage.getItem('replica_dev_token');
+            const token = getDevToken();
             const payload = {
                 owner: document.getElementById('dev-key-owner').value
             };
@@ -1097,8 +1191,8 @@ function setupDeveloperPortal() {
 }
 
 function loadDeveloperPortal() {
-    const token = localStorage.getItem('replica_dev_token');
-    const username = localStorage.getItem('replica_dev_username');
+    const token = getDevToken();
+    const username = getDevUsername();
     if (token && username) {
         showDeveloperDashboard(username);
     } else {
@@ -1118,10 +1212,17 @@ function showDeveloperDashboard(username) {
 function showDeveloperAuth() {
     document.getElementById('developer-auth-card').classList.remove('hidden');
     document.getElementById('developer-dashboard-card').classList.add('hidden');
+    const rememberedId = localStorage.getItem('replica_remember_identity');
+    const idInput = document.getElementById('login-identity');
+    const remCheckbox = document.getElementById('login-remember-me');
+    if (rememberedId && idInput) {
+        idInput.value = rememberedId;
+        if (remCheckbox) remCheckbox.checked = true;
+    }
 }
 
 async function loadDeveloperKeys() {
-    const token = localStorage.getItem('replica_dev_token');
+    const token = getDevToken();
     if (!token) return;
     try {
         const response = await fetch('/api/developer/keys', {
@@ -1182,7 +1283,7 @@ function renderDeveloperKeysTable(keys) {
 }
 
 async function deleteDeveloperKey(key) {
-    const token = localStorage.getItem('replica_dev_token');
+    const token = getDevToken();
     try {
         const response = await fetch(`/api/developer/keys/${key}`, {
             method: 'DELETE',
@@ -1201,7 +1302,7 @@ async function deleteDeveloperKey(key) {
 }
 
 async function loadDeveloperSettings() {
-    const token = localStorage.getItem('replica_dev_token');
+    const token = getDevToken();
     if (!token) return;
     try {
         const response = await fetch('/api/developer/settings', {
@@ -1224,7 +1325,7 @@ async function loadDeveloperSettings() {
 }
 
 async function saveDeveloperSettings() {
-    const token = localStorage.getItem('replica_dev_token');
+    const token = getDevToken();
     if (!token) return;
     
     const global_settings = {
@@ -1258,19 +1359,26 @@ async function saveDeveloperSettings() {
     const machinesPayload = [];
     machRows.forEach(row => {
         const powerInput = row.querySelector('.mach-power');
-        const premiumInput = row.querySelector('.mach-premium');
+        const startupInput = row.querySelector('.mach-startup');
+        const hourlyInput = row.querySelector('.mach-hourly');
         const providerInput = row.querySelector('.mach-provider');
         const enclosedInput = row.querySelector('.mach-enclosed');
-        const id = powerInput.getAttribute('data-id');
-        const name = row.querySelector('td').innerText;
-        machinesPayload.push({
-            id: id,
-            name: name,
-            provider: providerInput ? providerInput.value.trim() : '',
-            power_watts: parseFloat(powerInput.value),
-            flat_premium: parseFloat(premiumInput.value),
-            enclosed: enclosedInput ? enclosedInput.checked : false
-        });
+        if (powerInput) {
+            const id = powerInput.getAttribute('data-id');
+            const name = row.querySelector('td').innerText;
+            const startupVal = startupInput ? parseFloat(startupInput.value || 0) : 0.0;
+            const hourlyVal = hourlyInput ? parseFloat(hourlyInput.value || 0) : 0.0;
+            machinesPayload.push({
+                id: id,
+                name: name,
+                provider: providerInput ? providerInput.value.trim() : '',
+                power_watts: parseFloat(powerInput.value || 0),
+                startup_cost: startupVal,
+                hourly_rate: hourlyVal,
+                flat_premium: startupVal,
+                enclosed: enclosedInput ? enclosedInput.checked : false
+            });
+        }
     });
     
     const payload = {
@@ -1303,7 +1411,7 @@ async function saveDeveloperSettings() {
 }
 
 async function loadDeveloperUploads() {
-    const token = localStorage.getItem('replica_dev_token');
+    const token = getDevToken();
     if (!token) return;
     try {
         const response = await fetch('/api/developer/uploads', {
@@ -1346,6 +1454,34 @@ function renderDeveloperUploadsTable(uploads) {
         `;
         tbody.appendChild(row);
     });
+}
+
+const PRINTER_BRANDS = [
+    'Bambu Lab',
+    'Prusa',
+    'Creality',
+    'Elegoo',
+    'Anycubic',
+    'Sovol',
+    'Artillery',
+    'Snapmaker'
+];
+
+function renderBrandOptions(selectedBrand) {
+    const cur = (selectedBrand || '').trim();
+    let hasMatch = false;
+    let html = `<option value="" disabled ${!cur ? 'selected' : ''}>Sélectionnez un fabricant</option>`;
+    
+    PRINTER_BRANDS.forEach(brand => {
+        const isSel = cur.toLowerCase() === brand.toLowerCase() || (cur.toLowerCase() === 'bambulab' && brand === 'Bambu Lab');
+        if (isSel) hasMatch = true;
+        html += `<option value="${brand}" ${isSel ? 'selected' : ''}>${brand}</option>`;
+    });
+    
+    if (cur && !hasMatch) {
+        html += `<option value="${escapeHtml(cur)}" selected>${escapeHtml(cur)}</option>`;
+    }
+    return html;
 }
 
 function populateSettingsFields(data) {
@@ -1400,12 +1536,15 @@ function populateSettingsFields(data) {
     if (machTbody) {
         machTbody.innerHTML = '';
         data.machines.forEach(mach => {
+            const startupVal = mach.startup_cost !== undefined ? mach.startup_cost : (mach.flat_premium !== undefined ? mach.flat_premium : 0);
+            const hourlyVal = mach.hourly_rate !== undefined ? mach.hourly_rate : 0;
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td style="font-weight: 700;">${escapeHtml(mach.name)}</td>
-                <td><input type="text" class="tbl-input mach-provider" data-id="${mach.id}" value="${escapeHtml(mach.provider || '')}" placeholder="ex. Bambulab"></td>
+                <td><select class="tbl-input mach-provider" data-id="${mach.id}" style="cursor: pointer;">${renderBrandOptions(mach.provider)}</select></td>
                 <td><input type="number" step="10" class="tbl-input mach-power" data-id="${mach.id}" value="${mach.power_watts}"></td>
-                <td><input type="number" step="1" class="tbl-input mach-premium" data-id="${mach.id}" value="${mach.flat_premium}"></td>
+                <td><input type="number" step="0.5" class="tbl-input mach-startup" data-id="${mach.id}" value="${startupVal}"></td>
+                <td><input type="number" step="0.5" class="tbl-input mach-hourly" data-id="${mach.id}" value="${hourlyVal}"></td>
                 <td style="text-align: center;">
                     <input type="checkbox" class="mach-enclosed" data-id="${mach.id}" ${mach.enclosed ? 'checked' : ''} style="cursor: pointer; width: auto; transform: scale(1.1);">
                 </td>
@@ -1657,18 +1796,23 @@ async function saveSuperAdminSettings() {
     const machinesPayload = [];
     machRows.forEach(row => {
         const powerInput = row.querySelector('.sa-mach-power');
-        const premiumInput = row.querySelector('.sa-mach-premium');
+        const startupInput = row.querySelector('.sa-mach-startup');
+        const hourlyInput = row.querySelector('.sa-mach-hourly');
         const providerInput = row.querySelector('.sa-mach-provider');
         const enclosedInput = row.querySelector('.sa-mach-enclosed');
-        if (powerInput && premiumInput) {
+        if (powerInput) {
             const id = powerInput.getAttribute('data-id');
             const name = row.querySelector('td').innerText;
+            const startupVal = startupInput ? parseFloat(startupInput.value || 0) : 0.0;
+            const hourlyVal = hourlyInput ? parseFloat(hourlyInput.value || 0) : 0.0;
             machinesPayload.push({
                 id: id,
                 name: name,
                 provider: providerInput ? providerInput.value.trim() : '',
-                power_watts: parseFloat(powerInput.value),
-                flat_premium: parseFloat(premiumInput.value),
+                power_watts: parseFloat(powerInput.value || 0),
+                startup_cost: startupVal,
+                hourly_rate: hourlyVal,
+                flat_premium: startupVal,
                 enclosed: enclosedInput ? enclosedInput.checked : false
             });
         }
@@ -2408,6 +2552,14 @@ function setupCustomButtons() {
             const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
             const isEnclosed = enclosedInput ? enclosedInput.checked : false;
             
+            const powerInput = document.getElementById('new-machine-power');
+            const startupInput = document.getElementById('new-machine-startup');
+            const hourlyInput = document.getElementById('new-machine-hourly');
+            
+            const powerWatts = powerInput ? parseFloat(powerInput.value || 200.0) : 200.0;
+            const startupCost = startupInput ? parseFloat(startupInput.value || 0.0) : 0.0;
+            const hourlyRate = hourlyInput ? parseFloat(hourlyInput.value || 0.0) : 0.0;
+            
             if (addModalMode === 'dev') {
                 if (machines.some(m => m.id === id)) {
                     showToast(`L'imprimante '${name}' existe déjà.`, 'error');
@@ -2417,8 +2569,10 @@ function setupCustomButtons() {
                     id: id,
                     name: name,
                     provider: provider,
-                    power_watts: 200.0,
-                    flat_premium: 0.0,
+                    power_watts: powerWatts,
+                    startup_cost: startupCost,
+                    hourly_rate: hourlyRate,
+                    flat_premium: startupCost,
                     enclosed: isEnclosed
                 });
                 populateSettingsFields({
@@ -2435,8 +2589,10 @@ function setupCustomButtons() {
                     id: id,
                     name: name,
                     provider: provider,
-                    power_watts: 200.0,
-                    flat_premium: 0.0,
+                    power_watts: powerWatts,
+                    startup_cost: startupCost,
+                    hourly_rate: hourlyRate,
+                    flat_premium: startupCost,
                     enclosed: isEnclosed
                 });
                 renderSaMaterialsAndMachines(saMaterials, saMachines);
@@ -2479,12 +2635,15 @@ function renderSaMaterialsAndMachines(mats, machs) {
     if (machTbody) {
         machTbody.innerHTML = '';
         machs.forEach(mach => {
+            const startupVal = mach.startup_cost !== undefined ? mach.startup_cost : (mach.flat_premium !== undefined ? mach.flat_premium : 0);
+            const hourlyVal = mach.hourly_rate !== undefined ? mach.hourly_rate : 0;
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td style="font-weight: 700;">${escapeHtml(mach.name)}</td>
-                <td><input type="text" class="tbl-input sa-mach-provider" data-id="${mach.id}" value="${escapeHtml(mach.provider || '')}" placeholder="ex. Bambulab"></td>
+                <td><select class="tbl-input sa-mach-provider" data-id="${mach.id}" style="cursor: pointer;">${renderBrandOptions(mach.provider)}</select></td>
                 <td><input type="number" step="10" class="tbl-input sa-mach-power" data-id="${mach.id}" value="${mach.power_watts}"></td>
-                <td><input type="number" step="1" class="tbl-input sa-mach-premium" data-id="${mach.id}" value="${mach.flat_premium}"></td>
+                <td><input type="number" step="0.5" class="tbl-input sa-mach-startup" data-id="${mach.id}" value="${startupVal}"></td>
+                <td><input type="number" step="0.5" class="tbl-input sa-mach-hourly" data-id="${mach.id}" value="${hourlyVal}"></td>
                 <td style="text-align: center;">
                     <input type="checkbox" class="sa-mach-enclosed" data-id="${mach.id}" ${mach.enclosed ? 'checked' : ''} style="cursor: pointer; width: auto; transform: scale(1.1);">
                 </td>
