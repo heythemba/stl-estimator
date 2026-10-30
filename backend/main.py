@@ -236,11 +236,10 @@ async def catch_exceptions_middleware(request, call_next):
 @app.middleware("http")
 async def add_cache_control_headers(request: Request, call_next):
     response = await call_next(request)
-    path = request.url.path
-    if path == "/" or path.endswith((".html", ".js", ".css")) or not path.startswith("/api/"):
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
+    # Prevent browser caching across HTML, static assets, and API responses
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
     return response
 
 # Seed database tables and initial records

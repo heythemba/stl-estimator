@@ -124,52 +124,12 @@ function setupNavigation() {
 
 // 1.1 Page Freshness & Anti-Stale Cache Management
 function setupFreshnessListeners() {
-    // If restored from browser bfcache (Back/Forward cache), force fresh reload
+    // If restored from browser bfcache (Back/Forward navigation), ensure fresh reload
     window.addEventListener('pageshow', (event) => {
         if (event.persisted) {
             window.location.reload();
         }
     });
-
-    let lastPageLeaveTime = null;
-
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-            lastPageLeaveTime = Date.now();
-        } else {
-            handlePageReturn();
-        }
-    });
-
-    window.addEventListener('focus', () => {
-        handlePageReturn();
-    });
-
-    async function handlePageReturn() {
-        if (!lastPageLeaveTime) return;
-        const elapsed = Date.now() - lastPageLeaveTime;
-        lastPageLeaveTime = null;
-
-        // If user left browser/tab for more than 15 seconds:
-        if (elapsed > 15000) {
-            // If they are not actively analyzing an STL file, reload to get latest code & state
-            if (!activeStlFile) {
-                window.location.reload();
-                return;
-            }
-        }
-
-        // Silent live configuration sync
-        try {
-            await fetchConfig();
-            const devToken = getDevToken();
-            if (devToken) {
-                await loadDeveloperSettings();
-            }
-        } catch (e) {
-            console.warn('Silent config sync on page return:', e);
-        }
-    }
 }
 
 // 2. Fetch Configurations from API
@@ -179,13 +139,21 @@ async function fetchConfig() {
         if (response.ok) {
             const data = await response.json();
             
-            materials = data.materials || [];
-            machines = data.machines || [];
-            globalSettings = data.global_settings || {};
+            const pubMaterials = data.materials || [];
+            renderPublicMaterialSelector(pubMaterials);
             
-            renderPublicMaterialSelector();
-            populateAdminSelects();
-            populateSettingsFields(data);
+            // Only populate shared admin/settings from global defaults if not logged in on developer tab
+            const devToken = getDevToken();
+            const activeTab = localStorage.getItem('replica_active_tab') || 'public-tab';
+            
+            if (!devToken || activeTab === 'public-tab') {
+                materials = pubMaterials;
+                machines = data.machines || [];
+                globalSettings = data.global_settings || {};
+                
+                populateAdminSelects();
+                populateSettingsFields(data);
+            }
         }
     } catch (error) {
         console.error('Error fetching system configurations:', error);
@@ -196,11 +164,14 @@ async function fetchConfig() {
 }
 
 // 3. Public Estimator Logic
-function renderPublicMaterialSelector() {
+function renderPublicMaterialSelector(sourceMats) {
     const grid = document.getElementById('public-material-grid');
+    if (!grid) return;
     grid.innerHTML = '';
     
-    materials.forEach(mat => {
+    const mats = (sourceMats && sourceMats.length > 0) ? sourceMats : materials;
+    
+    mats.forEach(mat => {
         const card = document.createElement('div');
         card.className = `material-card ${mat.id === selectedPublicMaterialId ? 'active' : ''}`;
         card.setAttribute('data-id', mat.id);
@@ -536,6 +507,9 @@ function populateAdminSelects() {
     
     if (!matSelect || !machSelect) return;
     
+    const prevMat = matSelect.value;
+    const prevMach = machSelect.value;
+    
     matSelect.innerHTML = '';
     machSelect.innerHTML = '';
     
@@ -543,6 +517,7 @@ function populateAdminSelects() {
         const opt = document.createElement('option');
         opt.value = mat.id;
         opt.text = mat.name;
+        if (mat.id === prevMat) opt.selected = true;
         matSelect.appendChild(opt);
     });
     
@@ -550,6 +525,7 @@ function populateAdminSelects() {
         const opt = document.createElement('option');
         opt.value = mach.id;
         opt.text = mach.name;
+        if (mach.id === prevMach) opt.selected = true;
         machSelect.appendChild(opt);
     });
 }
@@ -1228,6 +1204,11 @@ async function loadDeveloperKeys() {
         const response = await fetch('/api/developer/keys', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
+        if (response.status === 401) {
+            clearDevAuth();
+            showDeveloperAuth();
+            return;
+        }
         if (response.ok) {
             const keys = await response.json();
             renderDeveloperKeysTable(keys);
@@ -1308,11 +1289,17 @@ async function loadDeveloperSettings() {
         const response = await fetch('/api/developer/settings', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
+        if (response.status === 401) {
+            clearDevAuth();
+            showDeveloperAuth();
+            showToast('Session expirée. Veuillez vous reconnecter.', 'warning');
+            return;
+        }
         if (response.ok) {
             const data = await response.json();
-            materials = data.materials;
-            machines = data.machines;
-            globalSettings = data.global_settings;
+            materials = data.materials || [];
+            machines = data.machines || [];
+            globalSettings = data.global_settings || {};
             
             populateAdminSelects();
             populateSettingsFields(data);
@@ -1417,6 +1404,11 @@ async function loadDeveloperUploads() {
         const response = await fetch('/api/developer/uploads', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
+        if (response.status === 401) {
+            clearDevAuth();
+            showDeveloperAuth();
+            return;
+        }
         if (response.ok) {
             const uploads = await response.json();
             renderDeveloperUploadsTable(uploads);
